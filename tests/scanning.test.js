@@ -15,6 +15,24 @@ describe('barcode validation', () => {
   it('parses SSCC with optional symbology identifier', () => {
     expect(parseGs1(']C100106141412345678908').ai).toEqual([{ ai: '00', value: '106141412345678908' }]);
   });
+  it('parses the photographed pallet fields AI 02, 11 and 37', () => {
+    const parsed = parseGs1('(02)04045907295032(11)251105(37)7065');
+    expect(parsed.ai).toEqual([
+      { ai: '02', value: '04045907295032' },
+      { ai: '11', value: '251105' },
+      { ai: '37', value: '7065' },
+    ]);
+    expect(validateScan({ value: '020404590729503211251105377065', type: 'gs1128', format: 'CODE_128' }).accepted).toBe(true);
+  });
+  it('trims whitespace before parsing a GS1 symbology identifier', () => {
+    expect(parseGs1('  ]C100106141412345678908  ').ai).toEqual([{ ai: '00', value: '106141412345678908' }]);
+  });
+  it('explains when plain Code 128 data is scanned in GS1-128 mode', () => {
+    const result = validateScan({ value: '295030101609420', type: 'gs1128', format: 'CODE_128' });
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toContain('295030101609420');
+    expect(result.reason).toContain('přepni typ na Code 128');
+  });
   it('accepts every valid GS1 parser reference vector', () => {
     for (const vector of vectors.parse_valid) {
       expect(parseGs1(vector.input).ai, vector.note).toEqual(vector.ai);

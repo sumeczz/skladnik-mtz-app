@@ -2,6 +2,19 @@
 
 Formát: Keep a Changelog; verze aplikace se zatím drží na 0.1.0.
 
+## [Nepublikováno] — audit projektu a diagnostika GS1-128
+
+### Opraveno
+- Chyba neznámého GS1 AI nyní zobrazí načtená data a poradí přepnout na Code 128, pokud jde o běžný interní kód.
+- GS1 parser ořízne bílé znaky před rozpoznáním prefixu symbologie `]C1`.
+- Přidány regresní testy pro AI 02 (GTIN obsahu), AI 11 (datum výroby) a AI 37 (počet kusů) a pro běžný Code 128 omylem načtený v režimu GS1-128.
+- Přidán skill `project-audit-repair` pro opakovatelný audit a opravy projektu.
+
+### Známá omezení
+- Úplná podpora všech GS1 Application Identifiers ani fyzické ověření FNC1/GS na telefonu tímto není potvrzeno.
+- Produkční build hlásí velký JavaScript chunk; build ale proběhl úspěšně.
+
+
 ## [Nepublikováno] – M2
 
 ### Přidáno

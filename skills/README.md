@@ -8,6 +8,7 @@ Popisy jsou záměrně „pushy", aby se skill použil i tehdy, když to uživat
 | Skill | Použij, když… | Milník |
 |---|---|---|
 | `project-bootstrap` | zakládáš projekt, přidáváš závislosti, měníš strukturu | M0 |
+| `project-audit-repair` | žádáš kontrolu, úklid, opravu nebo stabilizaci celého projektu | všechny |
 | `barcode-scanning` | děláš obrazovku skenování, výběr typu kódu, kontinuální režim, kameru | M1 |
 | `gs1-128` | řešíš GS1-128, SSCC, AI, kontrolní číslice, parsování čteného kódu | M1, M3 |
 | `pallet-sessions` | ukládáš skeny, dělíš po N, uzavíráš paletu, duplicity, vrácení | M2 |

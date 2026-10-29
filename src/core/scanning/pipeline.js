@@ -78,7 +78,8 @@ function validateAiValue(ai, value) {
 
 export function parseGs1(rawInput) {
   if (typeof rawInput !== 'string' || !rawInput.length) throw new Error('EMPTY');
-  let input = rawInput.startsWith(']C1') ? rawInput.slice(3) : rawInput;
+  let input = rawInput.trim();
+  input = input.startsWith(']C1') ? input.slice(3) : input;
   if (/\([0-9]{2,4}\)/.test(input)) {
     const fields = [...input.matchAll(/\(([0-9]{2,4})\)/g)];
     if (!fields.length || fields[0].index !== 0) throw new Error('BAD_FORMAT');
@@ -166,7 +167,10 @@ export function validateScan({ value, type, format }) {
         AMBIGUOUS_GS: 'Chybí oddělovač GS mezi proměnlivými poli.',
         EMPTY: 'Kód je prázdný.',
       };
-      return { accepted: false, reason: reasons[error.message] ?? 'Kód není platný GS1-128.' };
+      const reason = error.message === 'UNKNOWN_AI'
+        ? 'Neznámý AI v načtených datech: ' + normalized.slice(0, 80) + (normalized.length > 80 ? '...' : '') + '. Pokud jde o běžný Code 128 (např. interní číslo), přepni typ na Code 128. GS1-128 musí obsahovat platná pole AI.'
+        : reasons[error.message] ?? 'Kód není platný GS1-128.';
+      return { accepted: false, reason };
     }
   }
   return { accepted: true, value: normalized };
