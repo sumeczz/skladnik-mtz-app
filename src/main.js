@@ -3,7 +3,7 @@ import { openDatabase, getDashboardSummary, getSetting, saveSetting } from './st
 import { CameraScanSource } from './core/scanning/camera.js';
 import { CODE_TYPES, createScanPipeline, parseGs1 } from './core/scanning/pipeline.js';
 import bwipjs from 'bwip-js';
-import { addScanToPallet, closeActivePallet, listPallets, undoLastScan } from './core/scanning/pallet-store.js';
+import { addScanToPallet, closeActivePallet, listPallets, undoLastScan, listOrders, createOrder, setActiveOrder, updateOrder, deleteOrder, updatePallet, deletePallet } from './core/scanning/pallet-store.js';
 
 const byId = (id) => document.getElementById(id);
 const statusElement = byId('connection-status');
@@ -18,6 +18,8 @@ let vibrationEnabled = true;
 let paused = false;
 let torchEnabled = false;
 let pallets = [];
+let orders = [];
+let activeOrderId = null;
 let activePallet = null;
 let palletCapacity = 40;
 let savingScan = false;
@@ -126,6 +128,43 @@ function playRejectedFeedback() {
   if (vibrationEnabled && 'vibrate' in navigator) navigator.vibrate([150, 70, 150]);
 }
 
+function playPalletClosedFeedback() {
+  if (soundEnabled) {
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        const context = new AudioContextClass();
+        const gain = context.createGain();
+        gain.gain.setValueAtTime(0.0001, context.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.09, context.currentTime + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.34);
+        gain.connect(context.destination);
+        for (const [frequency, start, duration] of [[660, 0, 0.12], [880, 0.14, 0.18]]) {
+          const oscillator = context.createOscillator();
+          oscillator.type = 'triangle';
+          oscillator.frequency.value = frequency;
+          oscillator.connect(gain);
+          oscillator.start(context.currentTime + start);
+          oscillator.stop(context.currentTime + start + duration);
+        }
+        window.setTimeout(() => void context.close(), 600);
+      }
+    } catch (error) { console.debug('Close sound unavailable', error); }
+  }
+  if (vibrationEnabled && 'vibrate' in navigator) navigator.vibrate([55, 45, 90]);
+}
+
+function showSuccessfulScan(value) {
+  byId('scan-result-title').textContent = 'Kód načten a uložen';
+  byId('scan-result-value').textContent = value;
+  const flash = byId('scan-success-flash');
+  flash.classList.remove('scan-success-flash-active');
+  void flash.offsetWidth;
+  flash.classList.add('scan-success-flash-active');
+  window.clearTimeout(showSuccessfulScan.timeout);
+  showSuccessfulScan.timeout = window.setTimeout(() => flash.classList.remove('scan-success-flash-active'), 650);
+}
+
 function renderScans() {
   byId('session-scan-count').textContent = String(activePallet?.scanCount ?? 0);
   byId('last-scan-value').textContent = scans.length ? scans[0].value : 'Zatím nic';
@@ -159,7 +198,12 @@ function renderScans() {
 }
 
 async function refreshPalletState() {
-  pallets = await listPallets();
+  [pallets, orders] = await Promise.all([listPallets(), listOrders()]);
+  activeOrderId = (await getSetting('activeOrderId')) ?? null;
+  if (activeOrderId !== null && !orders.some((order) => order.id === Number(activeOrderId) && order.status === 'open')) {
+    activeOrderId = null;
+    await setActiveOrder(null);
+  }
   activePallet = pallets.find((pallet) => pallet.status === 'open') ?? null;
   scans = pallets.flatMap((pallet) => pallet.scans).sort((a, b) => b.scannedAt - a.scannedAt).map((scan) => ({ ...scan, at: scan.scannedAt, status: 'accepted' }));
   renderScans();
@@ -167,8 +211,85 @@ async function refreshPalletState() {
   byId('pallet-count').textContent = String(summary.palletCount);
   byId('open-pallet').textContent = activePallet ? `Paleta ${activePallet.number}` : 'Bez otevřené';
   byId('session-scan-count').textContent = String(activePallet?.scanCount ?? 0);
-  byId('active-pallet-label').textContent = activePallet ? `Paleta ${activePallet.number} · ${activePallet.scanCount}/${activePallet.capacity ?? palletCapacity}` : 'Nová paleta při dalším skenu';
+  const activeOrder = orders.find((order) => order.id === activePallet?.orderId);
+  byId('active-pallet-label').textContent = activePallet ? `Paleta ${activePallet.number} · ${activePallet.scanCount}/${activePallet.capacity ?? palletCapacity}${activeOrder ? ` · ${activeOrder.name}` : ''}` : `Nová paleta při dalším skenu${orders.find((order) => order.id === Number(activeOrderId)) ? ` · ${orders.find((order) => order.id === Number(activeOrderId)).name}` : ''}`;
   renderPalletList();
+  renderOrders();
+}
+
+function renderOrders() {
+  const select = byId('scan-order-select');
+  const selected = String(activeOrderId ?? '');
+  select.replaceChildren(new Option('Bez objednávky', ''));
+  for (const order of orders.filter((item) => item.status === 'open')) {
+    select.add(new Option(`${order.name}${order.reference ? ' · ' + order.reference : ''}`, String(order.id)));
+  }
+  select.value = orders.some((order) => String(order.id) === selected && order.status === 'open') ? selected : '';
+  const list = byId('order-list');
+  const query = (byId('order-search')?.value ?? '').trim().toLocaleLowerCase('cs-CZ');
+  list.replaceChildren();
+  const visibleOrders = orders.filter((order) => {
+    const relatedPallets = pallets.filter((pallet) => pallet.orderId === order.id);
+    const haystack = [order.name, order.reference, order.note, ...relatedPallets.map((pallet) => `paleta ${pallet.number} ${pallet.name} ${pallet.note}`)].join(' ').toLocaleLowerCase('cs-CZ');
+    return !query || haystack.includes(query);
+  });
+  byId('order-count').textContent = `${orders.length} objednávek`;
+  if (!visibleOrders.length) {
+    const empty = document.createElement('li');
+    empty.className = 'empty-list';
+    empty.textContent = query ? 'Žádná objednávka neodpovídá hledání.' : 'Zatím nejsou žádné objednávky.';
+    list.append(empty);
+  }
+  for (const order of visibleOrders) {
+    const item = document.createElement('li');
+    item.className = 'pallet-list-item order-list-item';
+    const details = document.createElement('div');
+    details.className = 'pallet-list-details';
+    const title = document.createElement('strong');
+    title.textContent = order.name;
+    const meta = document.createElement('small');
+    meta.textContent = `${order.reference || 'Bez čísla'} · ${order.palletCount} palet · ${order.scanCount} skenů · ${new Date(order.createdAt).toLocaleDateString('cs-CZ')}`;
+    const status = document.createElement('span');
+    status.className = `pallet-status ${order.status === 'open' ? 'pallet-status-open' : ''}`;
+    status.textContent = order.status === 'open' ? 'Aktivní' : 'Uzavřená';
+    details.append(title, meta, status);
+    if (order.note) {
+      const note = document.createElement('small');
+      note.textContent = order.note;
+      details.append(note);
+    }
+    const actions = document.createElement('div');
+    actions.className = 'history-actions';
+    for (const [action, label] of [['select', 'Použít'], ['edit', 'Upravit'], [order.status === 'open' ? 'close' : 'reopen', order.status === 'open' ? 'Uzavřít' : 'Znovu otevřít'], ['delete', 'Smazat']]) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `button ${action === 'delete' ? 'button-danger' : 'button-secondary'}`;
+      button.dataset.orderAction = action;
+      button.dataset.orderId = String(order.id);
+      button.textContent = label;
+      if (action === 'select' && order.status !== 'open') button.disabled = true;
+      actions.append(button);
+    }
+    item.append(details, actions);
+    list.append(item);
+    if (query) {
+      for (const pallet of pallets.filter((entry) => entry.orderId === order.id && [`paleta ${entry.number}`, entry.name, entry.note].join(' ').toLocaleLowerCase('cs-CZ').includes(query))) {
+        const palletItem = document.createElement('li');
+        palletItem.className = 'pallet-list-item nested-pallet-item';
+        const text = document.createElement('div');
+        text.className = 'pallet-list-details';
+        const name = document.createElement('strong');
+        name.textContent = `↳ Paleta ${pallet.number}${pallet.name ? ' · ' + pallet.name : ''}`;
+        const info = document.createElement('small');
+        info.textContent = `${pallet.scanCount} kódů · ${pallet.status === 'open' ? 'Otevřená' : 'Uzavřená'}`;
+        text.append(name, info);
+        const edit = document.createElement('button');
+        edit.type = 'button'; edit.className = 'button button-secondary'; edit.dataset.palletAction = 'edit'; edit.dataset.palletId = String(pallet.id); edit.textContent = 'Upravit paletu';
+        palletItem.append(text, edit);
+        list.append(palletItem);
+      }
+    }
+  }
 }
 
 function renderPalletList() {
@@ -182,7 +303,12 @@ function renderPalletList() {
     list.append(empty);
     return;
   }
-  for (const pallet of pallets) {
+  const query = (byId('order-search')?.value ?? '').trim().toLocaleLowerCase('cs-CZ');
+  const visiblePallets = pallets.filter((pallet) => {
+    const order = orders.find((entry) => entry.id === pallet.orderId);
+    return !query || [pallet.number, pallet.name, pallet.note, order?.name, order?.reference, ...pallet.scans.map((scan) => scan.value)].join(' ').toLocaleLowerCase('cs-CZ').includes(query);
+  });
+  for (const pallet of visiblePallets) {
     const item = document.createElement('li');
     item.className = 'pallet-list-item';
     const details = document.createElement('div');
@@ -200,8 +326,22 @@ function renderPalletList() {
     viewCodes.dataset.palletId = String(pallet.id);
     viewCodes.textContent = selectedPalletDetailId === pallet.id ? 'Zobrazeno' : 'Zobrazit kódy';
     viewCodes.setAttribute('aria-expanded', String(selectedPalletDetailId === pallet.id));
+    const order = orders.find((entry) => entry.id === pallet.orderId);
+    if (order) meta.textContent += ` · ${order.name}`;
     details.append(title, meta);
-    item.append(details, status, viewCodes);
+    const actions = document.createElement('div');
+    actions.className = 'history-actions';
+    actions.append(viewCodes);
+    for (const [action, label] of [['edit', 'Upravit'], ['delete', 'Smazat']]) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `button ${action === 'delete' ? 'button-danger' : 'button-secondary'}`;
+      button.dataset.palletAction = action;
+      button.dataset.palletId = String(pallet.id);
+      button.textContent = label;
+      actions.append(button);
+    }
+    item.append(details, status, actions);
     list.append(item);
   }
   renderPalletDetail();
@@ -281,6 +421,8 @@ async function handlePipelineResult(result) {
         return;
       }
       playAcceptedFeedback();
+      if (saved.pallet.status === 'closed') playPalletClosedFeedback();
+      showSuccessfulScan(result.value);
       await refreshPalletState();
       byId('scan-notice').className = 'notice notice-success';
       byId('scan-notice').textContent = saved.nextPallet
@@ -482,13 +624,121 @@ byId('pallets-back').addEventListener('click', () => showScreen('home'));
 byId('nav-home').addEventListener('click', () => showScreen('home'));
 byId('brand-home').addEventListener('click', (event) => { event.preventDefault(); showScreen('home'); });
 byId('nav-pallets').addEventListener('click', async () => { await refreshPalletState(); showScreen('pallets'); });
-byId('pallet-list').addEventListener('click', (event) => {
+byId('pallet-list').addEventListener('click', async (event) => {
+  const actionButton = event.target.closest('[data-pallet-action]');
+  if (actionButton) {
+    const id = Number(actionButton.dataset.palletId);
+    const pallet = pallets.find((item) => item.id === id);
+    if (!pallet) return;
+    try {
+      if (actionButton.dataset.palletAction === 'delete') {
+        if (!window.confirm(`Opravdu smazat paletu ${pallet.number} a všech ${pallet.scanCount} uložených skenů? Tuto akci nelze vrátit.`)) return;
+        await deletePallet(id);
+        if (selectedPalletDetailId === id) selectedPalletDetailId = null;
+        announce(`Paleta ${pallet.number} a její skeny byly smazány.`);
+      } else if (actionButton.dataset.palletAction === 'edit') {
+        const name = window.prompt('Název palety / štítek:', pallet.name ?? '');
+        if (name === null) return;
+        const note = window.prompt('Poznámka k paletě:', pallet.note ?? '');
+        if (note === null) return;
+        const orderChoices = ['Bez objednávky', ...orders.map((order) => `${order.id}: ${order.name}`)].join('\n');
+        const orderAnswer = window.prompt(`Přiřadit k objednávce (zadej ID, prázdné = bez objednávky):\n${orderChoices}`, pallet.orderId == null ? '' : String(pallet.orderId));
+        if (orderAnswer === null) return;
+        const orderId = orderAnswer.trim() ? Number(orderAnswer) : null;
+        if (orderId !== null && !orders.some((order) => order.id === orderId)) throw new Error('Takové ID objednávky neexistuje.');
+        await updatePallet(id, { name, note, orderId });
+      }
+      await refreshPalletState();
+    } catch (error) { announce(error.message); }
+    return;
+  }
   const button = event.target.closest('[data-pallet-id]');
   if (!button) return;
   const id = Number(button.dataset.palletId);
   selectedPalletDetailId = selectedPalletDetailId === id ? null : id;
   renderPalletList();
   if (selectedPalletDetailId !== null) byId('pallet-detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+byId('scan-order-select').addEventListener('change', async (event) => {
+  try {
+    activeOrderId = await setActiveOrder(event.target.value || null);
+    byId('quick-order-notice').className = 'notice notice-success';
+    byId('quick-order-notice').textContent = activeOrderId
+      ? `Nové palety budou přiřazeny k objednávce „${orders.find((order) => order.id === Number(activeOrderId))?.name ?? ''}“.`
+      : 'Nové palety nebudou přiřazeny k objednávce.';
+    await refreshPalletState();
+  } catch (error) {
+    byId('quick-order-notice').className = 'notice notice-error';
+    byId('quick-order-notice').textContent = error.message;
+  }
+});
+
+async function submitNewOrder(name, reference, note, noticeElement) {
+  try {
+    const order = await createOrder({ name, reference, note });
+    await refreshPalletState();
+    byId('scan-order-select').value = String(order.id);
+    noticeElement.className = 'notice notice-success';
+    noticeElement.textContent = `Objednávka „${order.name}“ vytvořena a vybrána pro skenování.`;
+    return order;
+  } catch (error) {
+    noticeElement.className = 'notice notice-error';
+    noticeElement.textContent = error.message;
+    return null;
+  }
+}
+byId('quick-order-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const order = await submitNewOrder(byId('quick-order-name').value, byId('quick-order-reference').value, '', byId('quick-order-notice'));
+  if (order) { byId('quick-order-form').reset(); byId('scan-order-select').value = String(order.id); }
+});
+byId('order-create-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const order = await submitNewOrder(byId('order-admin-name').value, byId('order-admin-reference').value, byId('order-admin-note').value, byId('order-admin-notice'));
+  if (order) { byId('order-create-form').reset(); byId('order-search').value = ''; }
+});
+byId('order-search').addEventListener('input', () => { renderOrders(); renderPalletList(); });
+byId('order-list').addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-order-action]');
+  if (!button) return;
+  const id = Number(button.dataset.orderId);
+  const order = orders.find((item) => item.id === id);
+  if (!order) return;
+  try {
+    switch (button.dataset.orderAction) {
+      case 'select':
+        await setActiveOrder(id);
+        activeOrderId = id;
+        byId('scan-order-select').value = String(id);
+        announce(`Pro skenování je vybrána objednávka „${order.name}“.`);
+        break;
+      case 'edit': {
+        const name = window.prompt('Název objednávky:', order.name);
+        if (name === null) return;
+        const reference = window.prompt('Číslo objednávky / reference:', order.reference ?? '');
+        if (reference === null) return;
+        const note = window.prompt('Poznámka:', order.note ?? '');
+        if (note === null) return;
+        await updateOrder(id, { name, reference, note });
+        break;
+      }
+      case 'close':
+        if (!window.confirm(`Uzavřít objednávku „${order.name}“? Stávající palety zůstanou zachovány.`)) return;
+        await updateOrder(id, { status: 'closed' });
+        break;
+      case 'reopen':
+        await updateOrder(id, { status: 'open' });
+        break;
+      case 'delete':
+        if (!window.confirm(`Smazat objednávku „${order.name}“? Objednávku lze smazat pouze tehdy, pokud k ní nejsou přiřazeny palety.`)) return;
+        await deleteOrder(id);
+        break;
+    }
+    await refreshPalletState();
+  } catch (error) {
+    byId('order-admin-notice').className = 'notice notice-error';
+    byId('order-admin-notice').textContent = error.message;
+  }
 });
 byId('pallet-detail-close').addEventListener('click', () => {
   selectedPalletDetailId = null;
@@ -497,6 +747,7 @@ byId('pallet-detail-close').addEventListener('click', () => {
 byId('close-pallet').addEventListener('click', async () => {
   try {
     const closed = await closeActivePallet();
+    if (closed) playPalletClosedFeedback();
     await refreshPalletState();
     announce(closed ? `Paleta ${closed.number} byla uzavřena.` : 'Není žádná otevřená paleta.');
   } catch (error) { announce(`Paletu se nepodařilo uzavřít: ${error.message}`); }

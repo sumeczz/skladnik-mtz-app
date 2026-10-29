@@ -69,6 +69,20 @@
             <button class="type-option" data-code-type="dataMatrix" type="button"><span class="type-symbol">▦</span><strong>Data Matrix</strong><small>2D kód</small></button>
             <button class="type-option" data-code-type="itf" type="button"><span class="type-symbol">▥</span><strong>ITF</strong><small>Prokládaný 2 z 5</small></button>
           </div>
+          <section class="order-picker" aria-labelledby="scan-order-title">
+            <div class="section-heading"><div><p class="section-kicker">VOLITELNÉ</p><h2 id="scan-order-title">Objednávka pro skenování</h2></div></div>
+            <label for="scan-order-select">Přiřazovat nové palety k objednávce</label>
+            <select id="scan-order-select"><option value="">Bez objednávky</option></select>
+            <form id="quick-order-form" class="quick-order-form">
+              <label for="quick-order-name">Nová objednávka</label>
+              <div class="order-create-fields">
+                <input id="quick-order-name" name="name" placeholder="Název objednávky *" required maxlength="100" />
+                <input id="quick-order-reference" name="reference" placeholder="Číslo objednávky / reference" maxlength="80" />
+                <button class="button button-primary" type="submit">Vytvořit a vybrat</button>
+              </div>
+              <p id="quick-order-notice" class="notice" role="status" aria-live="polite">Zvol objednávku před skenováním. Nové palety se k ní automaticky přiřadí.</p>
+            </form>
+          </section>
           <p id="type-error" class="notice notice-error" role="alert" hidden></p>
           <button id="begin-camera" class="button button-primary button-large button-full" type="button" disabled>Spustit skenování →</button>
         </section>
@@ -82,12 +96,14 @@
           <div class="camera-frame" aria-label="Celá plocha kamery se používá ke skenování">
             <video id="camera-video" playsinline muted autoplay aria-label="Náhled kamery – skenuje se celý obraz"></video>
             <div id="scan-reticle" class="scan-reticle" aria-hidden="true"><span></span></div>
+            <div id="scan-success-flash" class="scan-success-flash" aria-hidden="true">✓</div>
             <div id="camera-placeholder" class="camera-placeholder"><span class="camera-placeholder-icon">▣</span><strong id="camera-status-title">Kamera se připravuje</strong><p id="camera-status-detail">Povol přístup ke kameře, pokud se prohlížeč zeptá.</p></div>
           </div>
           <div class="scan-stats">
             <div><span class="stat-label">Načteno v relaci</span><strong id="session-scan-count" class="scan-count">0</strong></div>
             <div class="last-scan"><span class="stat-label">Poslední kód</span><strong id="last-scan-value">Zatím nic</strong><span id="last-scan-time"></span></div>
           </div>
+          <div id="scan-result-banner" class="scan-result-banner" role="status" aria-live="polite"><span class="scan-result-icon">✓</span><div><strong id="scan-result-title">Čekám na kód</strong><span id="scan-result-value">Načtený kód se zobrazí zde.</span></div></div>
           <p id="scan-notice" class="notice" role="status" aria-live="polite">Celý obraz kamery je aktivní skenovací plocha. Není potřeba mířit do rámečku.</p>
           <div class="scan-actions">
             <button id="reticle-toggle" class="button button-secondary" type="button" aria-pressed="false">Zobrazit zaměřovací pole</button>
@@ -116,6 +132,21 @@
             <div class="capacity-controls"><input id="pallet-capacity" type="number" min="1" max="10000" step="1" value="40" /><button id="save-capacity" class="button button-primary" type="button">Uložit limit</button></div>
             <p id="capacity-notice" class="notice" role="status" aria-live="polite">Výchozí limit je 40 kódů na paletu.</p>
           </div>
+          <section class="recent-scans order-history-section" aria-labelledby="order-history-title">
+            <div class="section-heading"><div><p class="section-kicker">ZAKÁZKY</p><h2 id="order-history-title">Objednávky</h2></div><span id="order-count" class="section-note">0 objednávek</span></div>
+            <input id="order-search" class="history-search" type="search" placeholder="Hledat název, číslo objednávky nebo paletu…" aria-label="Hledat objednávky a palety" />
+            <ol id="order-list" class="pallet-list"><li class="empty-list">Zatím nejsou žádné objednávky.</li></ol>
+            <form id="order-create-form" class="quick-order-form order-admin-form">
+              <h3>Nová objednávka</h3>
+              <div class="order-create-fields">
+                <input id="order-admin-name" name="name" placeholder="Název objednávky *" required maxlength="100" />
+                <input id="order-admin-reference" name="reference" placeholder="Číslo objednávky / reference" maxlength="80" />
+                <input id="order-admin-note" name="note" placeholder="Poznámka (volitelně)" maxlength="300" />
+                <button class="button button-primary" type="submit">Vytvořit objednávku</button>
+              </div>
+              <p id="order-admin-notice" class="notice" role="status" aria-live="polite"></p>
+            </form>
+          </section>
           <section class="recent-scans" aria-labelledby="pallet-history-title">
             <div class="section-heading"><h2 id="pallet-history-title">Historie palet</h2><span class="section-note">Nejnovější nahoře</span></div>
             <ol id="pallet-list" class="pallet-list"><li class="empty-list">Zatím nejsou žádné palety.</li></ol>

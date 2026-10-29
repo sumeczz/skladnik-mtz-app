@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { __resetDatabaseForTests, openDatabase, saveSetting } from '../src/storage/db.js';
-import { addScanToPallet, closeActivePallet, getActivePallet, listPallets, undoLastScan } from '../src/core/scanning/pallet-store.js';
+import { addScanToPallet, closeActivePallet, getActivePallet, listPallets, undoLastScan, createOrder, listOrders, setActiveOrder, updatePallet, deletePallet, deleteOrder } from '../src/core/scanning/pallet-store.js';
 
 describe('pallet persistence', () => {
   beforeEach(async () => { await __resetDatabaseForTests(); await openDatabase(); });
@@ -57,5 +57,30 @@ describe('pallet persistence', () => {
     expect(result.pallet.number).toBe(2);
     expect(result.pallet.scanCount).toBe(1);
     expect((await listPallets()).find((p) => p.number === 1).scanCount).toBe(2);
+  });
+
+  it('creates an order and assigns its new scans and pallets', async () => {
+    const order = await createOrder({ name: 'Zakázka 2026-42', reference: 'ORD-42', note: 'Expedice' });
+    const saved = await addScanToPallet({ value: 'ORDER-SCAN', type: 'code128', at: 1000 }, 5);
+    expect(saved.pallet.orderId).toBe(order.id);
+    const orders = await listOrders();
+    expect(orders[0]).toMatchObject({ id: order.id, name: 'Zakázka 2026-42', reference: 'ORD-42', palletCount: 1, scanCount: 1 });
+  });
+
+  it('edits pallet metadata and deletes its scans together with the pallet', async () => {
+    await addScanToPallet({ value: 'REMOVE-ME', type: 'code128', at: 1000 }, 5);
+    const pallet = (await listPallets())[0];
+    await updatePallet(pallet.id, { name: 'Křehké zboží', note: 'Horní patro' });
+    expect((await listPallets())[0]).toMatchObject({ name: 'Křehké zboží', note: 'Horní patro' });
+    expect(await deletePallet(pallet.id)).toMatchObject({ number: pallet.number, deletedScans: 1 });
+    expect(await listPallets()).toHaveLength(0);
+  });
+
+  it('prevents deleting an order while pallets are assigned to it', async () => {
+    const order = await createOrder({ name: 'Nesmí zmizet' });
+    await addScanToPallet({ value: 'KEEP', type: 'code128', at: 1000 }, 5);
+    await expect(deleteOrder(order.id)).rejects.toThrow('obsahuje palety');
+    await setActiveOrder(null);
+    expect((await listOrders())[0].name).toBe('Nesmí zmizet');
   });
 });

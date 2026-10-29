@@ -1,5 +1,5 @@
 const DB_NAME = 'skladnik-mtz';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 let dbPromise;
 
 function requestToPromise(request) {
@@ -32,6 +32,11 @@ export function openDatabase() {
       }
       if (!db.objectStoreNames.contains('counters')) db.createObjectStore('counters', { keyPath: 'name' });
       if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings', { keyPath: 'key' });
+      if (!db.objectStoreNames.contains('orders')) {
+        const store = db.createObjectStore('orders', { keyPath: 'id', autoIncrement: true });
+        store.createIndex('createdAt', 'createdAt', { unique: false });
+        store.createIndex('status', 'status', { unique: false });
+      }
     });
     request.addEventListener('success', () => {
       const db = request.result;

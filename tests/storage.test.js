@@ -8,8 +8,8 @@ describe('IndexedDB foundation', () => {
 
   it('opens a versioned database and creates all required stores', async () => {
     const db = await openDatabase();
-    expect(db.version).toBe(1);
-    expect([...db.objectStoreNames].sort()).toEqual(['counters', 'pallets', 'scans', 'settings']);
+    expect(db.version).toBe(2);
+    expect([...db.objectStoreNames].sort()).toEqual(['counters', 'orders', 'pallets', 'scans', 'settings']);
   });
   it('persists a setting between database transactions', async () => {
     await openDatabase();
