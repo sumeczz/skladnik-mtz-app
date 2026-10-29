@@ -18,3 +18,15 @@ Stav k 2026-10-29: automatické testy lze provádět v Node.js. Terénní testy 
 3. Zkopíruj hodnotu do textového editoru nebo prohlédni testovací výpis: mezi poli musí být znak GS s kódem U+001D (ASCII 29), ne pouhá mezera.
 4. Pokud chybí, aplikace má nejednoznačný obsah odmítnout. Nepoužívej takový výsledek pro skladovou evidenci; zkus průmyslový skener/HID.
 5. Výsledek zapiš výše. Tento test nelze nahradit unit testem s uměle vloženým GS.
+
+## M2 – palety a celé zorné pole (před provozem ověřit na telefonu)
+
+- [ ] Naskenovat různé štítky umístěné nahoře, dole a na okrajích náhledu; ověřit, že není potřeba cílit do rámečku.
+- [ ] Sken se objeví v seznamu a v sekci **Palety** i po obnovení stránky.
+- [ ] Změnit limit na 2; třetí přijatý kód patří do nové palety a předchozí se uzavře.
+- [ ] Zkusit načíst stejný kód dvakrát na stejné paletě; druhý pokus se odmítne.
+- [ ] Vrátit poslední sken, včetně případu, kdy se paleta právě naplnila.
+- [ ] Ručně uzavřít paletu a ověřit, že další sken založí novou.
+- [ ] Ověřit, že zvuk, vibrace a limit palety zůstávají nastavené po obnovení aplikace.
+
+Automatické testy těchto datových pravidel jsou v `tests/pallet-store.test.js`. Výše uvedené body pro kameru stále vyžadují fyzické zařízení.

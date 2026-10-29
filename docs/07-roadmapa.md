@@ -4,9 +4,9 @@ Milníky se dokončují postupně podle akceptačních kritérií a Definition o
 
 | # | Milník | Výsledek |
 |---|---|---|
-| M0 | Základ webu | Vite, HTML/CSS/JS, PWA shell, IndexedDB schema v1, testy, dokumentace. |
+| M0 | Základ webu | Hotovo: Vite, HTML/CSS/JS, PWA shell, IndexedDB schema v1, testy a dokumentace. |
 | M1 | Čtečka | Implementace hotova v kódu; automatické testy procházejí. Terénní ověření kamery a GS separátoru čeká na fyzickém telefonu (`docs/field-tests.md`). |
-| M2 | Palety | Skeny v IndexedDB, dělení po N, transakce, uzavírání, undo, duplicity, obnova po restartu. |
+| M2 | Palety | Implementováno: skeny v IndexedDB, dělení po N, uzavírání, undo, duplicity, preference a obnova po restartu. Automatické testy procházejí; fyzické ověření je další kontrolní krok. |
 | M3 | GS1-128 štítek | GS1 parser, SSCC, render kódu a round-trip testy proti vektorům. |
 | M4 | Export a historie | CSV/JSON/PDF, sdílení, hledání a detail palet. |
 | M5 | Nastavení a leštění | Preference, přístupnost, výkon, dlouhé běhy a test na reálných štítcích. |

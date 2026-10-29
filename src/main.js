@@ -1,7 +1,8 @@
 import './styles.css';
-import { openDatabase, getSetting, saveSetting } from './storage/db.js';
+import { openDatabase, getDashboardSummary, getSetting, saveSetting } from './storage/db.js';
 import { CameraScanSource } from './core/scanning/camera.js';
 import { CODE_TYPES, createScanPipeline } from './core/scanning/pipeline.js';
+import { addScanToPallet, closeActivePallet, listPallets, undoLastScan } from './core/scanning/pallet-store.js';
 
 const byId = (id) => document.getElementById(id);
 const statusElement = byId('connection-status');
@@ -15,6 +16,10 @@ let soundEnabled = true;
 let vibrationEnabled = true;
 let paused = false;
 let torchEnabled = false;
+let pallets = [];
+let activePallet = null;
+let palletCapacity = 40;
+let savingScan = false;
 
 function announce(message) {
   const target = byId('home-message');
@@ -40,11 +45,12 @@ function showScreen(screen) {
     home: byId('home-screen'),
     types: byId('type-screen'),
     camera: byId('camera-screen'),
+    pallets: byId('pallets-screen'),
     settings: byId('settings-screen'),
   };
   for (const [key, element] of Object.entries(screens)) element.hidden = key !== screen;
   document.querySelectorAll('.nav-item').forEach((item) => item.classList.remove('nav-item-active'));
-  const activeNav = screen === 'settings' ? byId('nav-settings') : screen === 'camera' || screen === 'types' ? null : byId('nav-home');
+  const activeNav = screen === 'settings' ? byId('nav-settings') : screen === 'pallets' ? byId('nav-pallets') : screen === 'camera' || screen === 'types' ? null : byId('nav-home');
   if (activeNav) activeNav.classList.add('nav-item-active');
   if (screen !== 'camera' && cameraSource) void stopCamera();
   window.scrollTo({ top: 0, behavior: 'auto' });
@@ -77,7 +83,7 @@ function setCameraStatus(state, detail = '') {
   byId('camera-status-title').textContent = titles[state] ?? 'Kamera se připravuje';
   byId('camera-status-detail').textContent = detail || ({
     requesting: 'Povol přístup ke kameře, pokud se prohlížeč zeptá.',
-    running: 'Drž čárový kód uvnitř rámečku.',
+    running: 'Celý obraz kamery je aktivní skenovací plocha. Kód nemusí být v rámečku.',
     paused: 'Stiskni Pokračovat, až budeš připraven.',
     stopped: 'Spusť kameru, až budeš připraven.',
     error: 'Zkontroluj oprávnění a zabezpečené připojení.',
@@ -118,8 +124,7 @@ function playRejectedFeedback() {
 }
 
 function renderScans() {
-  byId('session-scan-count').textContent = String(scans.length);
-  byId('pallet-count').textContent = String(scans.length);
+  byId('session-scan-count').textContent = String(activePallet?.scanCount ?? 0);
   byId('last-scan-value').textContent = scans.length ? scans[0].value : 'Zatím nic';
   byId('last-scan-time').textContent = scans.length ? new Date(scans[0].at).toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '';
   byId('undo-scan').disabled = scans.length === 0;
@@ -150,14 +155,74 @@ function renderScans() {
   }
 }
 
-function handlePipelineResult(result) {
+async function refreshPalletState() {
+  pallets = await listPallets();
+  activePallet = pallets.find((pallet) => pallet.status === 'open') ?? null;
+  scans = pallets.flatMap((pallet) => pallet.scans).sort((a, b) => b.scannedAt - a.scannedAt).map((scan) => ({ ...scan, at: scan.scannedAt, status: 'accepted' }));
+  renderScans();
+  const summary = await getDashboardSummary();
+  byId('pallet-count').textContent = String(summary.palletCount);
+  byId('open-pallet').textContent = activePallet ? `Paleta ${activePallet.number}` : 'Bez otevřené';
+  byId('session-scan-count').textContent = String(activePallet?.scanCount ?? 0);
+  byId('active-pallet-label').textContent = activePallet ? `Paleta ${activePallet.number} · ${activePallet.scanCount}/${activePallet.capacity ?? palletCapacity}` : 'Nová paleta při dalším skenu';
+  renderPalletList();
+}
+
+function renderPalletList() {
+  const list = byId('pallet-list');
+  if (!list) return;
+  list.replaceChildren();
+  if (!pallets.length) {
+    const empty = document.createElement('li');
+    empty.className = 'empty-list';
+    empty.textContent = 'Zatím nejsou vytvořené žádné palety. První vznikne při načtení kódu.';
+    list.append(empty);
+    return;
+  }
+  for (const pallet of pallets) {
+    const item = document.createElement('li');
+    item.className = 'pallet-list-item';
+    const details = document.createElement('div');
+    details.className = 'pallet-list-details';
+    const title = document.createElement('strong');
+    title.textContent = `Paleta ${pallet.number}`;
+    const meta = document.createElement('small');
+    meta.textContent = `${pallet.scanCount ?? pallet.scans.length} / ${pallet.capacity ?? palletCapacity} kódů · ${new Date(pallet.createdAt).toLocaleString('cs-CZ')}`;
+    const status = document.createElement('span');
+    status.className = `pallet-status ${pallet.status === 'open' ? 'pallet-status-open' : ''}`;
+    status.textContent = pallet.status === 'open' ? 'Otevřená' : 'Uzavřená';
+    details.append(title, meta);
+    item.append(details, status);
+    list.append(item);
+  }
+}
+
+async function handlePipelineResult(result) {
   if (result.status === 'accepted') {
-    scans.unshift(result);
-    renderScans();
-    playAcceptedFeedback();
-    byId('scan-notice').className = 'notice notice-success';
-    byId('scan-notice').textContent = 'Načteno. Můžeš hned pokračovat dalším kódem.';
-    byId('last-scan-value').title = result.value;
+    if (savingScan) return;
+    savingScan = true;
+    try {
+      const saved = await addScanToPallet({ ...result, at: result.at ?? Date.now() }, palletCapacity);
+      if (saved.status === 'duplicate') {
+        byId('scan-notice').className = 'notice notice-error';
+        byId('scan-notice').textContent = `Duplicitní kód – na paletě ${saved.pallet.number} už je uložen.`;
+        playRejectedFeedback();
+        return;
+      }
+      playAcceptedFeedback();
+      await refreshPalletState();
+      byId('scan-notice').className = 'notice notice-success';
+      byId('scan-notice').textContent = saved.nextPallet
+        ? `Paleta ${saved.pallet.number} je plná a uzavřela se. Pokračuješ na paletě ${saved.nextPallet.number}.`
+        : `Uloženo na paletu ${saved.pallet.number}. ${saved.pallet.scanCount}/${palletCapacity} kódů.`;
+      byId('last-scan-value').title = result.value;
+    } catch (error) {
+      byId('scan-notice').className = 'notice notice-error';
+      byId('scan-notice').textContent = `Kód se nepodařilo bezpečně uložit: ${error.message}`;
+      playRejectedFeedback();
+    } finally {
+      savingScan = false;
+    }
     return;
   }
   if (result.status === 'rejected') {
@@ -188,7 +253,7 @@ async function startCamera() {
   byId('camera-title').textContent = 'Skenování';
   byId('active-code-type').textContent = CODE_TYPES[selectedType].label;
   byId('scan-notice').className = 'notice';
-  byId('scan-notice').textContent = 'Drž kód v rámečku. Čtečka běží kontinuálně.';
+  byId('scan-notice').textContent = 'Skenuje se celý obraz kamery. Není potřeba mířit do rámečku.';
   pipeline = createScanPipeline({ type: selectedType, onResult: handlePipelineResult });
   cameraSource = new CameraScanSource({
     videoElement: byId('camera-video'),
@@ -282,24 +347,52 @@ byId('manual-form').addEventListener('submit', (event) => {
     closeManualDialog();
   }
 });
-byId('undo-scan').addEventListener('click', () => {
-  if (!scans.length) return;
-  scans.shift();
-  renderScans();
-  byId('scan-notice').className = 'notice';
-  byId('scan-notice').textContent = 'Poslední sken byl vrácen z dočasného seznamu. Palety se spravují až v M2.';
+byId('undo-scan').addEventListener('click', async () => {
+  try {
+    const undone = await undoLastScan();
+    if (!undone) return;
+    await refreshPalletState();
+    byId('scan-notice').className = 'notice';
+    byId('scan-notice').textContent = `Vrácen poslední sken z palety ${undone.palletNumber}.`;
+  } catch (error) {
+    byId('scan-notice').className = 'notice notice-error';
+    byId('scan-notice').textContent = `Sken se nepodařilo vrátit: ${error.message}`;
+  }
 });
 byId('open-settings').addEventListener('click', () => showScreen('settings'));
 byId('settings-back').addEventListener('click', () => showScreen('home'));
+byId('pallets-back').addEventListener('click', () => showScreen('home'));
 byId('nav-home').addEventListener('click', () => showScreen('home'));
 byId('brand-home').addEventListener('click', (event) => { event.preventDefault(); showScreen('home'); });
-byId('nav-pallets').addEventListener('click', () => {
-  announce('Historie a ukládání palet budou doplněny v milníku M2.');
-  showScreen('home');
+byId('nav-pallets').addEventListener('click', async () => { await refreshPalletState(); showScreen('pallets'); });
+byId('close-pallet').addEventListener('click', async () => {
+  try {
+    const closed = await closeActivePallet();
+    await refreshPalletState();
+    announce(closed ? `Paleta ${closed.number} byla uzavřena.` : 'Není žádná otevřená paleta.');
+  } catch (error) { announce(`Paletu se nepodařilo uzavřít: ${error.message}`); }
+});
+byId('save-capacity').addEventListener('click', async () => {
+  const value = Number(byId('pallet-capacity').value);
+  if (!Number.isInteger(value) || value < 1 || value > 10000) {
+    byId('capacity-notice').textContent = 'Zadej celé číslo od 1 do 10 000.';
+    byId('capacity-notice').className = 'notice notice-error';
+    return;
+  }
+  try {
+    palletCapacity = value;
+    await saveSetting('palletCapacity', value);
+    byId('capacity-notice').className = 'notice notice-success';
+    byId('capacity-notice').textContent = `Limit ${value} kódů byl uložen. U otevřené palety se nový limit uplatní při dalším skenu.`;
+    await refreshPalletState();
+  } catch (error) {
+    byId('capacity-notice').className = 'notice notice-error';
+    byId('capacity-notice').textContent = error.message;
+  }
 });
 byId('nav-settings').addEventListener('click', () => showScreen('settings'));
-byId('setting-sound').addEventListener('change', (event) => { soundEnabled = event.target.checked; });
-byId('setting-vibration').addEventListener('change', (event) => { vibrationEnabled = event.target.checked; });
+byId('setting-sound').addEventListener('change', async (event) => { soundEnabled = event.target.checked; await saveSetting('soundEnabled', soundEnabled); });
+byId('setting-vibration').addEventListener('change', async (event) => { vibrationEnabled = event.target.checked; await saveSetting('vibrationEnabled', vibrationEnabled); });
 window.addEventListener('pagehide', () => { if (cameraSource) void cameraSource.stop(); });
 
 async function boot() {
@@ -308,6 +401,13 @@ async function boot() {
     setStorageStatus(true);
     const installedAt = await getSetting('firstRunAt');
     if (!installedAt) await saveSetting('firstRunAt', new Date().toISOString());
+    palletCapacity = Number(await getSetting('palletCapacity')) || 40;
+    soundEnabled = (await getSetting('soundEnabled')) ?? true;
+    vibrationEnabled = (await getSetting('vibrationEnabled')) ?? true;
+    byId('setting-sound').checked = soundEnabled;
+    byId('setting-vibration').checked = vibrationEnabled;
+    byId('pallet-capacity').value = String(palletCapacity);
+    await refreshPalletState();
   } catch (error) {
     console.error('Application bootstrap failed', error);
     setStorageStatus(false, 'Prohlížeč zablokoval lokální úložiště. Zkus aplikaci otevřít v běžném prohlížeči.');

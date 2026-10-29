@@ -24,19 +24,19 @@
       <main id="main-content" class="main-content">
         <section id="home-screen">
           <section class="hero" aria-labelledby="home-title">
-            <div class="eyebrow"><span class="eyebrow-dot"></span> OFFLINE-FIRST · M1</div>
+            <div class="eyebrow"><span class="eyebrow-dot"></span> OFFLINE-FIRST · M2</div>
             <h1 id="home-title">Sklad pod kontrolou.</h1>
-            <p class="hero-copy">Vyber typ kódu, namiř kameru a skenuj dál bez opakovaného dotýkání displeje.</p>
+            <p class="hero-copy">Vyber typ kódu a namiř kameru kamkoli na štítek. Skenuje se celý obraz, ne jen zaměřovací rámeček.</p>
             <div class="hero-actions">
               <button id="start-scan" class="button button-primary button-large" type="button"><span class="button-icon" aria-hidden="true">▦</span> Skenovat <span class="button-arrow" aria-hidden="true">→</span></button>
               <button id="open-settings" class="button button-secondary button-large" type="button">Nastavení <span aria-hidden="true">↗</span></button>
             </div>
-            <p id="home-message" class="inline-notice" aria-live="polite">Čtečka podporuje kameru i ruční zadání. Naskenované kódy zatím zůstávají v dočasném seznamu do obnovení stránky; ukládání do palet přijde v M2.</p>
+            <p id="home-message" class="inline-notice" aria-live="polite">Skeny se průběžně ukládají do tohoto zařízení. Otevřená paleta i historie zůstanou po zavření aplikace zachované.</p>
           </section>
           <section class="section-block" aria-labelledby="overview-title">
             <div class="section-heading"><div><p class="section-kicker">PŘEHLED</p><h2 id="overview-title">Pracovní plocha</h2></div><span class="section-note">Tento telefon</span></div>
             <div class="stats-grid">
-              <article class="stat-card"><span class="stat-label">Skeny v této relaci</span><strong id="pallet-count" class="stat-value">0</strong><span class="stat-caption">Dočasná paměť · M1</span></article>
+              <article class="stat-card"><span class="stat-label">Uložené palety</span><strong id="pallet-count" class="stat-value">0</strong><span class="stat-caption">Trvale v tomto zařízení · M2</span></article>
               <article class="stat-card"><span class="stat-label">Aktivní režim</span><strong id="open-pallet" class="stat-value">Připraven</strong><span class="stat-caption">Čeká na výběr typu</span></article>
               <article class="stat-card stat-card-accent"><span class="stat-label">Režim aplikace</span><strong class="stat-value stat-text">Offline</strong><span class="stat-caption">Bez účtu a cloudu</span></article>
             </div>
@@ -46,7 +46,7 @@
             <div class="setup-list">
               <article class="setup-item"><span class="setup-check" aria-hidden="true">✓</span><div><strong>Základ aplikace</strong><p>Responzivní PWA a lokální úložiště.</p></div><span class="setup-state">M0</span></article>
               <article class="setup-item"><span class="setup-check" aria-hidden="true">✓</span><div><strong>Čtečka kódů</strong><p>Výběr formátu, kamera, ruční zadání a kontrola vstupu.</p></div><span class="setup-state">M1</span></article>
-              <article class="setup-item"><span class="setup-check setup-pending" aria-hidden="true">03</span><div><strong>Správa palet</strong><p>Okamžité ukládání, dělení po N skenech a obnova.</p></div><span class="setup-state setup-state-pending">M2</span></article>
+              <article class="setup-item"><span class="setup-check" aria-hidden="true">✓</span><div><strong>Správa palet</strong><p>Trvalé ukládání, automatické dělení, uzavírání a obnova po restartu.</p></div><span class="setup-state">M2</span></article>
             </div>
           </section>
         </section>
@@ -76,16 +76,15 @@
             <div class="scanner-heading"><p class="section-kicker">KROK 2 ZE 2</p><h1 id="camera-title" class="scanner-title">Skenování</h1><span id="active-code-type" class="scanner-type">Vybraný formát</span></div>
             <button id="torch-toggle" class="icon-button" type="button" aria-label="Zapnout svítilnu" title="Svítilna">☼</button>
           </div>
-          <div class="camera-frame">
-            <video id="camera-video" playsinline muted autoplay aria-label="Náhled kamery"></video>
-            <div class="scan-reticle" aria-hidden="true"><span></span></div>
+          <div class="camera-frame" aria-label="Celá plocha kamery se používá ke skenování">
+            <video id="camera-video" playsinline muted autoplay aria-label="Náhled kamery – skenuje se celý obraz"></video>
             <div id="camera-placeholder" class="camera-placeholder"><span class="camera-placeholder-icon">▣</span><strong id="camera-status-title">Kamera se připravuje</strong><p id="camera-status-detail">Povol přístup ke kameře, pokud se prohlížeč zeptá.</p></div>
           </div>
           <div class="scan-stats">
             <div><span class="stat-label">Načteno v relaci</span><strong id="session-scan-count" class="scan-count">0</strong></div>
             <div class="last-scan"><span class="stat-label">Poslední kód</span><strong id="last-scan-value">Zatím nic</strong><span id="last-scan-time"></span></div>
           </div>
-          <p id="scan-notice" class="notice" role="status" aria-live="polite">Drž kód v rámečku. Čtečka běží kontinuálně.</p>
+          <p id="scan-notice" class="notice" role="status" aria-live="polite">Celý obraz kamery je aktivní skenovací plocha. Není potřeba mířit do rámečku.</p>
           <div class="scan-actions">
             <button id="pause-camera" class="button button-secondary" type="button">Ⅱ Pozastavit</button>
             <button id="manual-entry" class="button button-secondary" type="button">⌨ Ručně</button>
@@ -97,15 +96,35 @@
           </section>
         </section>
 
+        <section id="pallets-screen" class="scan-screen" hidden aria-labelledby="pallets-title">
+          <button type="button" class="back-link" id="pallets-back">← Zpět na přehled</button>
+          <p class="section-kicker">M2 · TRVALÉ ULOŽENÍ</p>
+          <h1 id="pallets-title" class="screen-title">Palety</h1>
+          <p class="screen-copy">Každý přijatý kód se ukládá do zařízení. Otevřená paleta se obnoví i po zavření aplikace.</p>
+          <article class="active-pallet-card">
+            <div><span class="stat-label">Aktuální paleta</span><strong id="active-pallet-label">Nová paleta při dalším skenu</strong></div>
+            <button id="close-pallet" class="button button-secondary" type="button">Uzavřít paletu</button>
+          </article>
+          <div class="capacity-editor">
+            <label for="pallet-capacity">Počet kódů na paletu</label>
+            <div class="capacity-controls"><input id="pallet-capacity" type="number" min="1" max="10000" step="1" value="40" /><button id="save-capacity" class="button button-primary" type="button">Uložit limit</button></div>
+            <p id="capacity-notice" class="notice" role="status" aria-live="polite">Výchozí limit je 40 kódů na paletu.</p>
+          </div>
+          <section class="recent-scans" aria-labelledby="pallet-history-title">
+            <div class="section-heading"><h2 id="pallet-history-title">Historie palet</h2><span class="section-note">Nejnovější nahoře</span></div>
+            <ol id="pallet-list" class="pallet-list"><li class="empty-list">Zatím nejsou žádné palety.</li></ol>
+          </section>
+        </section>
+
         <section id="settings-screen" class="scan-screen" hidden aria-labelledby="settings-title">
           <button type="button" class="back-link" id="settings-back">← Zpět na přehled</button>
           <p class="section-kicker">PREFERENCE</p><h1 id="settings-title" class="screen-title">Nastavení skenování</h1>
           <label class="setting-row"><span><strong>Zvuk při načtení</strong><small>Krátké potvrzení po přijetí kódu.</small></span><input id="setting-sound" type="checkbox" checked /></label>
           <label class="setting-row"><span><strong>Vibrace při načtení</strong><small>Haptická odezva, pokud ji telefon podporuje.</small></span><input id="setting-vibration" type="checkbox" checked /></label>
-          <p class="screen-copy">Nastavení platí v této kartě prohlížeče. Ukládání preferencí a skenů bude sjednoceno v M2.</p>
+          <p class="screen-copy">Preference se ukládají do zařízení a obnoví se při příštím spuštění.</p>
         </section>
       </main>
-      <footer class="footer"><span>SKLADNÍK MTZ</span><span id="app-version">M1 · Čtečka kódů</span><span>Data zůstávají v zařízení</span></footer>
+      <footer class="footer"><span>SKLADNÍK MTZ</span><span id="app-version">M2 · Palety a skenování</span><span>Data zůstávají v zařízení</span></footer>
       <nav class="bottom-nav" aria-label="Hlavní navigace">
         <button type="button" class="nav-item nav-item-active" id="nav-home"><span aria-hidden="true">⌂</span><span>Domů</span></button>
         <button type="button" class="nav-item" id="nav-pallets"><span aria-hidden="true">▤</span><span>Palety</span></button>

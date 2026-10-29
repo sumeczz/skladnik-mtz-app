@@ -186,7 +186,7 @@ export function createScanPipeline({ type, onResult, clock = () => Date.now(), c
       const now = clock();
       if (previousAt !== undefined && now - previousAt < cooldownMs) return { status: 'cooldown' };
       lastAccepted.set(checked.value, now);
-      const result = { status: 'accepted', value: checked.value, type, source: rawScan.source ?? 'camera', at: now, gs1: checked.gs1 };
+      const result = { status: 'accepted', value: checked.value, type, format: rawScan.format, source: rawScan.source ?? 'camera', at: now, gs1: checked.gs1 };
       onResult(result);
       return result;
     },
