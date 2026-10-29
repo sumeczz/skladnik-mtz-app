@@ -6,8 +6,8 @@
     <meta name="theme-color" content="#10251c" />
     <meta name="color-scheme" content="light" />
     <meta name="description" content="Offline-first mobilní aplikace pro evidenci skladových skenů a palet." />
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
     <title>Skladník MTZ</title>
   </head>
   <body>
@@ -17,8 +17,11 @@
           <span class="brand-mark" aria-hidden="true">S</span>
           <span><strong>Skladník MTZ</strong><small>Evidence skladových skenů</small></span>
         </a>
-        <div id="connection-status" class="connection-status" role="status" aria-live="polite">
-          <span class="status-dot" aria-hidden="true"></span><span>Kontrola úložiště…</span>
+        <div class="topbar-actions">
+          <div id="connection-status" class="connection-status" role="status" aria-live="polite">
+            <span class="status-dot" aria-hidden="true"></span><span>Kontrola úložiště…</span>
+          </div>
+          <button type="button" id="fullscreen-toggle" class="fullscreen-toggle" aria-label="Přepnout celou obrazovku" aria-pressed="false" title="Celá obrazovka">⛶</button>
         </div>
       </header>
       <main id="main-content" class="main-content">

@@ -519,6 +519,26 @@ byId('save-capacity').addEventListener('click', async () => {
     byId('capacity-notice').textContent = error.message;
   }
 });
+byId('fullscreen-toggle').addEventListener('click', async () => {
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+    } else if (document.documentElement.requestFullscreen) {
+      await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+    } else {
+      announce('Celá obrazovka není v tomto prohlížeči dostupná. Po instalaci PWA se aplikace otevře samostatně.');
+    }
+  } catch (error) {
+    announce('Celou obrazovku nelze zapnout. Na iPhonu/iPadu přidej aplikaci na plochu a spusť ji odtud.');
+  }
+});
+document.addEventListener('fullscreenchange', () => {
+  const active = Boolean(document.fullscreenElement);
+  const button = byId('fullscreen-toggle');
+  button.setAttribute('aria-pressed', String(active));
+  button.textContent = active ? '↙' : '⛶';
+  button.title = active ? 'Ukončit celou obrazovku' : 'Celá obrazovka';
+});
 byId('nav-settings').addEventListener('click', () => showScreen('settings'));
 byId('setting-sound').addEventListener('change', async (event) => { soundEnabled = event.target.checked; await saveSetting('soundEnabled', soundEnabled); });
 byId('setting-vibration').addEventListener('change', async (event) => { vibrationEnabled = event.target.checked; await saveSetting('vibrationEnabled', vibrationEnabled); });
@@ -542,7 +562,7 @@ async function boot() {
     setStorageStatus(false, 'Prohlížeč zablokoval lokální úložiště. Zkus aplikaci otevřít v běžném prohlížeči.');
   }
   if ('serviceWorker' in navigator && import.meta.env.PROD) {
-    try { await navigator.serviceWorker.register('/sw.js'); }
+    try { await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL }); }
     catch (error) { console.error('Service worker registration failed', error); }
   }
 }

@@ -226,3 +226,45 @@ h2 { margin: 0; font-size: 22px; letter-spacing: -.7px; } .section-note { color:
 .pallet-generated-barcode svg { display: block; width: 100%; max-width: 100%; height: auto; max-height: 110px; }
 .pallet-generated-barcode-error { color: #8d2c22; background: #fff8f6; }
 
+/* Keep generated pallet labels on their own full-width row. */
+#pallet-code-list .recent-scan-item { flex-wrap: wrap; min-width: 0; }
+#pallet-code-list .recent-scan-body { flex: 1 1 100%; width: 100%; }
+#pallet-code-list .pallet-generated-barcode {
+  box-sizing: border-box;
+  flex: 1 0 100%;
+  width: 100%;
+  min-width: 0;
+}
+#pallet-code-list .pallet-generated-barcode svg {
+  display: block;
+  width: 100% !important;
+  max-width: none;
+  height: auto;
+}
+
+/* Fullscreen control stays reachable on both handhelds and desktop. */
+.topbar-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.fullscreen-toggle {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  background: #fff;
+  font-size: 25px;
+  line-height: 1;
+  cursor: pointer;
+}
+.fullscreen-toggle:hover, .fullscreen-toggle[aria-pressed="true"] {
+  color: var(--green);
+  border-color: #b6d4bb;
+  background: #eaf2e9;
+}
+@media (max-width: 640px) {
+  .topbar-actions { gap: 6px; }
+  .fullscreen-toggle { width: 38px; height: 38px; border-radius: 11px; }
+}
+
