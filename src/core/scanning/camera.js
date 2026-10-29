@@ -27,6 +27,11 @@ export class CameraScanSource extends ScanSource {
     this.paused = false;
     this.torchOn = false;
     this.lastError = null;
+    this.scanAreaSize = 'medium';
+    this.scanAreaEnabled = false;
+    this.scanLoopId = null;
+    this.scanCanvas = document.createElement('canvas');
+    this.scanContext = this.scanCanvas.getContext('2d', { willReadFrequently: true });
     this.onVisibilityChange = this.handleVisibilityChange.bind(this);
     document.addEventListener('visibilitychange', this.onVisibilityChange);
   }
@@ -40,24 +45,21 @@ export class CameraScanSource extends ScanSource {
     this.paused = false;
     const formats = CODE_TYPES[type].formats.map((format) => FORMAT_MAP[format]);
     const hints = new Map([[DecodeHintType.POSSIBLE_FORMATS, formats], [DecodeHintType.TRY_HARDER, true]]);
-    this.reader = new BrowserMultiFormatReader(hints, { delayBetweenScanAttempts: 120, delayBetweenScanSuccess: 120 });
+    this.reader = new BrowserMultiFormatReader(hints);
     this.onStatus('requesting');
     try {
-      this.controls = await this.reader.decodeFromConstraints(
-        { audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
-        this.videoElement,
-        (result, error) => {
-          if (!this.active || this.paused) return;
-          if (result) {
-            this.lastError = null;
-            this.onScan({ value: result.getText(), format: this.formatName(result.getBarcodeFormat()), source: 'camera', at: Date.now() });
-          } else if (error && !String(error.name).includes('NotFoundException')) {
-            this.lastError = error;
-          }
-        },
-      );
-      if (!this.active) { this.controls.stop(); return; }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+      if (!this.active) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      this.videoElement.srcObject = stream;
+      await this.videoElement.play();
       this.onStatus('running');
+      this.scanFrame();
     } catch (error) {
       this.active = false;
       this.onStatus('error');
@@ -74,6 +76,46 @@ export class CameraScanSource extends ScanSource {
     }
   }
 
+  setScanAreaSize(size) {
+    if (['small', 'medium', 'large', 'extra-large'].includes(size)) this.scanAreaSize = size;
+  }
+
+  setScanAreaEnabled(enabled) {
+    this.scanAreaEnabled = Boolean(enabled);
+  }
+
+  getScanArea() {
+    if (!this.scanAreaEnabled) return { width: 1, height: 1 };
+    return ({
+      small: { width: 0.42, height: 0.18 },
+      medium: { width: 0.60, height: 0.28 },
+      large: { width: 0.78, height: 0.42 },
+      'extra-large': { width: 0.92, height: 0.62 },
+    })[this.scanAreaSize];
+  }
+
+  scanFrame() {
+    if (!this.active || this.paused) return;
+    const video = this.videoElement;
+    if (video?.readyState >= 2 && video.videoWidth && video.videoHeight) {
+      const area = this.getScanArea();
+      const width = Math.max(1, Math.round(video.videoWidth * area.width));
+      const height = Math.max(1, Math.round(video.videoHeight * area.height));
+      const left = Math.round((video.videoWidth - width) / 2);
+      const top = Math.round((video.videoHeight - height) / 2);
+      if (this.scanCanvas.width !== width) this.scanCanvas.width = width;
+      if (this.scanCanvas.height !== height) this.scanCanvas.height = height;
+      this.scanContext.drawImage(video, left, top, width, height, 0, 0, width, height);
+      try {
+        const result = this.reader.decodeFromCanvas(this.scanCanvas);
+        if (result) this.onScan({ value: result.getText(), format: this.formatName(result.getBarcodeFormat()), source: 'camera', at: Date.now() });
+      } catch (error) {
+        if (!String(error?.name ?? error).includes('NotFoundException')) this.lastError = error;
+      }
+    }
+    this.scanLoopId = requestAnimationFrame(() => this.scanFrame());
+  }
+
   formatName(format) {
     return Object.entries(FORMAT_MAP).find(([, value]) => value === format)?.[0] ?? 'UNKNOWN';
   }
@@ -84,6 +126,8 @@ export class CameraScanSource extends ScanSource {
     this.torchOn = false;
     this.controls?.stop();
     this.controls = null;
+    if (this.scanLoopId !== null) cancelAnimationFrame(this.scanLoopId);
+    this.scanLoopId = null;
     const stream = this.videoElement?.srcObject;
     if (stream instanceof MediaStream) stream.getTracks().forEach((track) => track.stop());
     if (this.videoElement) {
@@ -95,6 +139,8 @@ export class CameraScanSource extends ScanSource {
 
   async pause() {
     this.paused = true;
+    if (this.scanLoopId !== null) cancelAnimationFrame(this.scanLoopId);
+    this.scanLoopId = null;
     this.controls?.stop();
     this.controls = null;
     const stream = this.videoElement?.srcObject;

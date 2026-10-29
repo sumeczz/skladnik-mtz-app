@@ -294,7 +294,7 @@ async function startCamera() {
   byId('camera-title').textContent = 'Skenování';
   byId('active-code-type').textContent = CODE_TYPES[selectedType].label;
   byId('scan-notice').className = 'notice';
-  byId('scan-notice').textContent = 'Skenuje se celý obraz kamery. Není potřeba mířit do rámečku.';
+  byId('scan-notice').textContent = reticleVisible ? 'Skenování je omezené na vybranou oblast rámečku.' : 'Skenuje se celý obraz kamery. Zapni rámeček pro skenování v omezené oblasti.';
   pipeline = createScanPipeline({ type: selectedType, onResult: handlePipelineResult });
   cameraSource = new CameraScanSource({
     videoElement: byId('camera-video'),
@@ -308,6 +308,9 @@ async function startCamera() {
       setCameraStatus('error', error.message);
     },
   });
+  cameraSource.setScanAreaSize(byId('scan-area-size').value);
+  cameraSource.setScanAreaEnabled(reticleVisible);
+  updateReticleGeometry();
   try {
     await cameraSource.start(selectedType);
     byId('pause-camera').disabled = false;
@@ -343,6 +346,28 @@ async function togglePause() {
   }
 }
 
+function updateReticleGeometry() {
+  const reticle = byId('scan-reticle');
+  const frame = byId('camera-video');
+  const frameBox = byId('camera-screen').querySelector('.camera-frame');
+  const sizes = {
+    small: { width: 0.42, height: 0.18 },
+    medium: { width: 0.60, height: 0.28 },
+    large: { width: 0.78, height: 0.42 },
+    'extra-large': { width: 0.92, height: 0.62 },
+  };
+  const size = sizes[byId('scan-area-size').value] ?? sizes.medium;
+  const frameWidth = frameBox.clientWidth;
+  const frameHeight = frameBox.clientHeight;
+  const videoWidth = frame.videoWidth || 16;
+  const videoHeight = frame.videoHeight || 9;
+  const scale = Math.min(frameWidth / videoWidth, frameHeight / videoHeight);
+  const visibleWidth = videoWidth * scale;
+  const visibleHeight = videoHeight * scale;
+  reticle.style.width = `${(visibleWidth * size.width / frameWidth) * 100}%`;
+  reticle.style.height = `${(visibleHeight * size.height / frameHeight) * 100}%`;
+}
+
 byId('start-scan').addEventListener('click', showTypePicker);
 byId('type-back').addEventListener('click', () => showScreen('home'));
 byId('camera-back').addEventListener('click', () => showTypePicker());
@@ -355,13 +380,24 @@ byId('pause-camera').addEventListener('click', togglePause);
 byId('reticle-toggle').addEventListener('click', () => {
   reticleVisible = !reticleVisible;
   byId('scan-reticle').classList.toggle('scan-reticle-visible', reticleVisible);
+  cameraSource?.setScanAreaEnabled(reticleVisible);
   byId('reticle-toggle').setAttribute('aria-pressed', String(reticleVisible));
   byId('reticle-toggle').textContent = reticleVisible ? 'Skrýt zaměřovací pole' : 'Zobrazit zaměřovací pole';
   byId('scan-notice').className = 'notice';
   byId('scan-notice').textContent = reticleVisible
-    ? 'Zaměřovací pole je pouze vizuální pomůcka. Skenování stále probíhá přes celý obraz kamery.'
-    : 'Celý obraz kamery je aktivní skenovací plocha. Není potřeba mířit do rámečku.';
+    ? 'Skenování je omezené pouze na obraz uvnitř rámečku.'
+    : 'Skenuje se celý obraz kamery.';
 });
+byId('scan-area-size').addEventListener('change', (event) => {
+  cameraSource?.setScanAreaSize(event.target.value);
+  updateReticleGeometry();
+  byId('scan-notice').className = 'notice';
+  byId('scan-notice').textContent = reticleVisible
+    ? 'Velikost rámečku i skutečné skenovací oblasti byla změněna.'
+    : 'Velikost oblasti je připravena. Zapni zaměřovací pole, pokud chceš omezit skenování.';
+});
+byId('camera-video').addEventListener('loadedmetadata', updateReticleGeometry);
+window.addEventListener('resize', updateReticleGeometry);
 byId('torch-toggle').addEventListener('click', async () => {
   try {
     if (!cameraSource) throw new Error('Nejdřív spusť kameru.');
