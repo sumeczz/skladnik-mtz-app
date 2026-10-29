@@ -1,5 +1,6 @@
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { BarcodeFormat, DecodeHintType } from '@zxing/library';
+import { readBarcodes } from 'zxing-wasm/reader';
 import { CODE_TYPES } from './pipeline.js';
 import { ScanSource } from './scan-source.js';
 
@@ -30,6 +31,8 @@ export class CameraScanSource extends ScanSource {
     this.scanAreaSize = 'medium';
     this.scanAreaEnabled = false;
     this.scanLoopId = null;
+    this.wasmBusy = false;
+    this.lastWasmScanAt = 0;
     this.scanCanvas = document.createElement('canvas');
     this.scanContext = this.scanCanvas.getContext('2d', { willReadFrequently: true });
     this.onVisibilityChange = this.handleVisibilityChange.bind(this);
@@ -106,11 +109,37 @@ export class CameraScanSource extends ScanSource {
       if (this.scanCanvas.width !== width) this.scanCanvas.width = width;
       if (this.scanCanvas.height !== height) this.scanCanvas.height = height;
       this.scanContext.drawImage(video, left, top, width, height, 0, 0, width, height);
-      try {
-        const result = this.reader.decodeFromCanvas(this.scanCanvas);
-        if (result) this.onScan({ value: result.getText(), format: this.formatName(result.getBarcodeFormat()), source: 'camera', at: Date.now() });
-      } catch (error) {
-        if (!String(error?.name ?? error).includes('NotFoundException')) this.lastError = error;
+      if (this.type === 'gs1128') {
+        // GS1-128 uses ZXing-C++/WASM, independently of the legacy JS decoder.
+        // Limit work to one in-flight decode and four attempts per second.
+        const now = Date.now();
+        if (!this.wasmBusy && now - this.lastWasmScanAt >= 250) {
+          this.wasmBusy = true;
+          this.lastWasmScanAt = now;
+          const imageData = this.scanContext.getImageData(0, 0, width, height);
+          void readBarcodes(imageData, {
+            formats: ['Code128'],
+            tryHarder: true,
+            tryRotate: true,
+            tryInvert: true,
+            maxNumberOfSymbols: 1,
+          }).then((results) => {
+            if (!this.active || this.paused) return;
+            const result = results.find((item) => item && !item.error && item.text);
+            if (result) this.onScan({ value: result.text, format: 'CODE_128', source: 'camera-zxing-wasm', at: Date.now() });
+          }).catch((error) => {
+            this.lastError = error;
+          }).finally(() => {
+            this.wasmBusy = false;
+          });
+        }
+      } else {
+        try {
+          const result = this.reader.decodeFromCanvas(this.scanCanvas);
+          if (result) this.onScan({ value: result.getText(), format: this.formatName(result.getBarcodeFormat()), source: 'camera', at: Date.now() });
+        } catch (error) {
+          if (!String(error?.name ?? error).includes('NotFoundException')) this.lastError = error;
+        }
       }
     }
     this.scanLoopId = requestAnimationFrame(() => this.scanFrame());
