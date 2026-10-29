@@ -78,6 +78,8 @@ Doménová logika GS1 a dělení palet musí být čistý JavaScript bez DOM vaz
 6. Nikdy netvrď, že aplikace běží na telefonu, pokud to nebylo přímo ověřeno. Jasně odděluj automatické testy od testů na zařízení.
 
 ## 7. Příkazy
+
+M1 navíc obsahuje dekodér ZXing Browser; před další změnou zkontroluj `docs/field-tests.md` a nepředpokládej, že GS separator funguje na každém telefonu.
 ```powershell
 npm install
 npm run dev -- --host 0.0.0.0

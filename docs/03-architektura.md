@@ -47,6 +47,15 @@ tools/gs1_reference.py
 
 ## Platformní rozhraní
 
+### Skenování (M1)
+
+- `ScanSource` je adaptér pro vstup skenů; `CameraScanSource` používá `@zxing/browser`, `FakeScanSource` slouží automatickým testům.
+- `CODE_128` je fyzický formát pro Code 128 i GS1-128. Výběr GS1-128 navíc vyžaduje validaci AI a zachování oddělovače GS (ASCII 29 / U+001D).
+- `ScanPipeline` provádí filtr formátu, validaci EAN/GS1 a per-hodnota cooldown 800 ms. M1 drží skeny v paměti; M2 přesune přijetí skenu do atomické transakce IndexedDB.
+- Kamera potřebuje secure context (HTTPS nebo localhost). Pauza/obnovení, svítilna a lifecycle se liší podle prohlížeče a vyžadují test na telefonu.
+
+## Platformní rozhraní
+
 - `ScanSource`: start(type), stop(), události úspěšných skenů; kamera i pozdější HID skener implementují stejné rozhraní.
 - `PalletRepository`: metody nad IndexedDB; každá zapisující operace určuje transakční hranici.
 - `FeedbackService`: zvuk a vibrace jsou volitelné, s detekcí nepodporovaných API.

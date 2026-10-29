@@ -13,7 +13,7 @@
   <body>
     <div id="app" class="app-shell">
       <header class="topbar">
-        <a class="brand" href="/" aria-label="Skladník MTZ – domů">
+        <a class="brand" href="/" id="brand-home" aria-label="Skladník MTZ – domů">
           <span class="brand-mark" aria-hidden="true">S</span>
           <span><strong>Skladník MTZ</strong><small>Evidence skladových skenů</small></span>
         </a>
@@ -22,40 +22,105 @@
         </div>
       </header>
       <main id="main-content" class="main-content">
-        <section class="hero" aria-labelledby="home-title">
-          <div class="eyebrow"><span class="eyebrow-dot"></span> OFFLINE-FIRST · M0</div>
-          <h1 id="home-title">Sklad pod kontrolou.</h1>
-          <p class="hero-copy">Základ pro rychlé a spolehlivé skenování. Data zůstávají v tomto zařízení.</p>
-          <div class="hero-actions">
-            <button id="start-scan" class="button button-primary button-large" type="button"><span class="button-icon" aria-hidden="true">▦</span> Skenovat <span class="button-arrow" aria-hidden="true">→</span></button>
-            <button id="open-settings" class="button button-secondary button-large" type="button">Nastavení <span aria-hidden="true">↗</span></button>
-          </div>
-          <p id="home-message" class="inline-notice" aria-live="polite">Základ aplikace je připraven. Čtečka bude doplněna v milníku M1.</p>
+        <section id="home-screen">
+          <section class="hero" aria-labelledby="home-title">
+            <div class="eyebrow"><span class="eyebrow-dot"></span> OFFLINE-FIRST · M1</div>
+            <h1 id="home-title">Sklad pod kontrolou.</h1>
+            <p class="hero-copy">Vyber typ kódu, namiř kameru a skenuj dál bez opakovaného dotýkání displeje.</p>
+            <div class="hero-actions">
+              <button id="start-scan" class="button button-primary button-large" type="button"><span class="button-icon" aria-hidden="true">▦</span> Skenovat <span class="button-arrow" aria-hidden="true">→</span></button>
+              <button id="open-settings" class="button button-secondary button-large" type="button">Nastavení <span aria-hidden="true">↗</span></button>
+            </div>
+            <p id="home-message" class="inline-notice" aria-live="polite">Čtečka podporuje kameru i ruční zadání. Naskenované kódy zatím zůstávají v dočasném seznamu do obnovení stránky; ukládání do palet přijde v M2.</p>
+          </section>
+          <section class="section-block" aria-labelledby="overview-title">
+            <div class="section-heading"><div><p class="section-kicker">PŘEHLED</p><h2 id="overview-title">Pracovní plocha</h2></div><span class="section-note">Tento telefon</span></div>
+            <div class="stats-grid">
+              <article class="stat-card"><span class="stat-label">Skeny v této relaci</span><strong id="pallet-count" class="stat-value">0</strong><span class="stat-caption">Dočasná paměť · M1</span></article>
+              <article class="stat-card"><span class="stat-label">Aktivní režim</span><strong id="open-pallet" class="stat-value">Připraven</strong><span class="stat-caption">Čeká na výběr typu</span></article>
+              <article class="stat-card stat-card-accent"><span class="stat-label">Režim aplikace</span><strong class="stat-value stat-text">Offline</strong><span class="stat-caption">Bez účtu a cloudu</span></article>
+            </div>
+          </section>
+          <section class="section-block setup-section" aria-labelledby="setup-title">
+            <div class="section-heading"><div><p class="section-kicker">MILNÍKY</p><h2 id="setup-title">Postup vývoje</h2></div></div>
+            <div class="setup-list">
+              <article class="setup-item"><span class="setup-check" aria-hidden="true">✓</span><div><strong>Základ aplikace</strong><p>Responzivní PWA a lokální úložiště.</p></div><span class="setup-state">M0</span></article>
+              <article class="setup-item"><span class="setup-check" aria-hidden="true">✓</span><div><strong>Čtečka kódů</strong><p>Výběr formátu, kamera, ruční zadání a kontrola vstupu.</p></div><span class="setup-state">M1</span></article>
+              <article class="setup-item"><span class="setup-check setup-pending" aria-hidden="true">03</span><div><strong>Správa palet</strong><p>Okamžité ukládání, dělení po N skenech a obnova.</p></div><span class="setup-state setup-state-pending">M2</span></article>
+            </div>
+          </section>
         </section>
-        <section class="section-block" aria-labelledby="overview-title">
-          <div class="section-heading"><div><p class="section-kicker">PŘEHLED</p><h2 id="overview-title">Pracovní plocha</h2></div><span class="section-note">Tento telefon</span></div>
-          <div class="stats-grid">
-            <article class="stat-card"><span class="stat-label">Celkem palet</span><strong id="pallet-count" class="stat-value">—</strong><span class="stat-caption">Uloženo lokálně</span></article>
-            <article class="stat-card"><span class="stat-label">Otevřená paleta</span><strong id="open-pallet" class="stat-value">—</strong><span class="stat-caption">Aktuální pracovní dávka</span></article>
-            <article class="stat-card stat-card-accent"><span class="stat-label">Režim aplikace</span><strong class="stat-value stat-text">Offline</strong><span class="stat-caption">Bez účtu a cloudu</span></article>
+
+        <section id="type-screen" class="scan-screen" hidden aria-labelledby="type-title">
+          <button type="button" class="back-link" id="type-back">← Zpět na přehled</button>
+          <p class="section-kicker">KROK 1 ZE 2</p>
+          <h1 id="type-title" class="screen-title">Jaký kód budeš skenovat?</h1>
+          <p class="screen-copy">Vyber konkrétní formát. Čtečka ostatní typy ignoruje.</p>
+          <div id="code-type-options" class="code-type-grid">
+            <button class="type-option" data-code-type="code128" type="button"><span class="type-symbol">▥</span><strong>Code 128</strong><small>Text a čísla</small></button>
+            <button class="type-option" data-code-type="gs1128" type="button"><span class="type-symbol">▤</span><strong>GS1-128</strong><small>AI, GTIN, šarže</small></button>
+            <button class="type-option" data-code-type="qr" type="button"><span class="type-symbol">▦</span><strong>QR kód</strong><small>2D kód</small></button>
+            <button class="type-option" data-code-type="ean13" type="button"><span class="type-symbol">▥</span><strong>EAN-13</strong><small>13 číslic</small></button>
+            <button class="type-option" data-code-type="ean8" type="button"><span class="type-symbol">▥</span><strong>EAN-8</strong><small>8 číslic</small></button>
+            <button class="type-option" data-code-type="code39" type="button"><span class="type-symbol">▥</span><strong>Code 39</strong><small>Alfanumerický</small></button>
+            <button class="type-option" data-code-type="dataMatrix" type="button"><span class="type-symbol">▦</span><strong>Data Matrix</strong><small>2D kód</small></button>
+            <button class="type-option" data-code-type="itf" type="button"><span class="type-symbol">▥</span><strong>ITF</strong><small>Prokládaný 2 z 5</small></button>
           </div>
+          <p id="type-error" class="notice notice-error" role="alert" hidden></p>
+          <button id="begin-camera" class="button button-primary button-large button-full" type="button" disabled>Spustit skenování →</button>
         </section>
-        <section class="section-block setup-section" aria-labelledby="setup-title">
-          <div class="section-heading"><div><p class="section-kicker">ZÁKLAD PROVOZU</p><h2 id="setup-title">Připraveno po krocích</h2></div></div>
-          <div class="setup-list">
-            <article class="setup-item"><span class="setup-check" aria-hidden="true">✓</span><div><strong>Lokální úložiště</strong><p>IndexedDB – palety, skeny a nastavení v zařízení.</p></div><span class="setup-state" id="storage-state">Kontrola…</span></article>
-            <article class="setup-item"><span class="setup-check setup-pending" aria-hidden="true">02</span><div><strong>Čtečka kódů</strong><p>Výběr typu, kamera a ruční zadání v M1.</p></div><span class="setup-state setup-state-pending">M1</span></article>
-            <article class="setup-item"><span class="setup-check setup-pending" aria-hidden="true">03</span><div><strong>Správa palet a GS1-128</strong><p>Atomické ukládání a SSCC navážou v dalších milnících.</p></div><span class="setup-state setup-state-pending">M2–M3</span></article>
+
+        <section id="camera-screen" class="scan-screen" hidden aria-labelledby="camera-title">
+          <div class="scanner-header">
+            <button id="camera-back" class="icon-button" type="button" aria-label="Zpět na výběr typu">←</button>
+            <div class="scanner-heading"><p class="section-kicker">KROK 2 ZE 2</p><h1 id="camera-title" class="scanner-title">Skenování</h1><span id="active-code-type" class="scanner-type">Vybraný formát</span></div>
+            <button id="torch-toggle" class="icon-button" type="button" aria-label="Zapnout svítilnu" title="Svítilna">☼</button>
           </div>
+          <div class="camera-frame">
+            <video id="camera-video" playsinline muted autoplay aria-label="Náhled kamery"></video>
+            <div class="scan-reticle" aria-hidden="true"><span></span></div>
+            <div id="camera-placeholder" class="camera-placeholder"><span class="camera-placeholder-icon">▣</span><strong id="camera-status-title">Kamera se připravuje</strong><p id="camera-status-detail">Povol přístup ke kameře, pokud se prohlížeč zeptá.</p></div>
+          </div>
+          <div class="scan-stats">
+            <div><span class="stat-label">Načteno v relaci</span><strong id="session-scan-count" class="scan-count">0</strong></div>
+            <div class="last-scan"><span class="stat-label">Poslední kód</span><strong id="last-scan-value">Zatím nic</strong><span id="last-scan-time"></span></div>
+          </div>
+          <p id="scan-notice" class="notice" role="status" aria-live="polite">Drž kód v rámečku. Čtečka běží kontinuálně.</p>
+          <div class="scan-actions">
+            <button id="pause-camera" class="button button-secondary" type="button">Ⅱ Pozastavit</button>
+            <button id="manual-entry" class="button button-secondary" type="button">⌨ Ručně</button>
+            <button id="undo-scan" class="button button-secondary" type="button" disabled>↶ Vrátit</button>
+          </div>
+          <section class="recent-scans" aria-labelledby="recent-title">
+            <div class="section-heading"><h2 id="recent-title">Poslední skeny</h2><span class="section-note">Jen tato relace</span></div>
+            <ol id="recent-scan-list" class="recent-list"><li class="empty-list">Zatím nebyl načten žádný kód.</li></ol>
+          </section>
+        </section>
+
+        <section id="settings-screen" class="scan-screen" hidden aria-labelledby="settings-title">
+          <button type="button" class="back-link" id="settings-back">← Zpět na přehled</button>
+          <p class="section-kicker">PREFERENCE</p><h1 id="settings-title" class="screen-title">Nastavení skenování</h1>
+          <label class="setting-row"><span><strong>Zvuk při načtení</strong><small>Krátké potvrzení po přijetí kódu.</small></span><input id="setting-sound" type="checkbox" checked /></label>
+          <label class="setting-row"><span><strong>Vibrace při načtení</strong><small>Haptická odezva, pokud ji telefon podporuje.</small></span><input id="setting-vibration" type="checkbox" checked /></label>
+          <p class="screen-copy">Nastavení platí v této kartě prohlížeče. Ukládání preferencí a skenů bude sjednoceno v M2.</p>
         </section>
       </main>
-      <footer class="footer"><span>SKLADNÍK MTZ</span><span id="app-version">M0 · Webová aplikace</span><span>Data zůstávají v zařízení</span></footer>
+      <footer class="footer"><span>SKLADNÍK MTZ</span><span id="app-version">M1 · Čtečka kódů</span><span>Data zůstávají v zařízení</span></footer>
       <nav class="bottom-nav" aria-label="Hlavní navigace">
-        <button type="button" class="nav-item nav-item-active" aria-current="page" id="nav-home"><span aria-hidden="true">⌂</span><span>Domů</span></button>
+        <button type="button" class="nav-item nav-item-active" id="nav-home"><span aria-hidden="true">⌂</span><span>Domů</span></button>
         <button type="button" class="nav-item" id="nav-pallets"><span aria-hidden="true">▤</span><span>Palety</span></button>
         <button type="button" class="nav-item" id="nav-settings"><span aria-hidden="true">⚙</span><span>Nastavení</span></button>
       </nav>
     </div>
+    <dialog id="manual-dialog" class="manual-dialog" aria-labelledby="manual-title">
+      <form id="manual-form" method="dialog">
+        <div class="section-heading"><div><p class="section-kicker">NÁHRADNÍ VSTUP</p><h2 id="manual-title">Zadat kód ručně</h2></div><button type="button" id="manual-close" class="icon-button" aria-label="Zavřít">×</button></div>
+        <label for="manual-value">Obsah čárového kódu</label>
+        <textarea id="manual-value" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Napiš nebo vlož celý kód" required></textarea>
+        <p class="manual-hint">Ruční vstup prochází stejnou kontrolou typu a kontrolní číslice.</p>
+        <div class="hero-actions"><button class="button button-primary" type="submit">Přijmout kód</button><button class="button button-secondary manual-cancel" type="button" id="manual-cancel">Zrušit</button></div>
+      </form>
+    </dialog>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

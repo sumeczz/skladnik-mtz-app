@@ -1,0 +1,73 @@
+import { describe, expect, it, vi } from 'vitest';
+import { calculateCheckDigit, createScanPipeline, parseGs1, validateEan, validateScan } from '../src/core/scanning/pipeline.js';
+import vectors from '../docs/test-vectors/gs1_vectors.json';
+import { FakeScanSource } from '../src/core/scanning/scan-source.js';
+
+describe('barcode validation', () => {
+  it('calculates check digits from the reference vectors', () => {
+    for (const vector of vectors.check_digit) expect(calculateCheckDigit(vector.payload)).toBe(vector.expected);
+  });
+  it('validates EAN-13 and EAN-8 checksums', () => {
+    expect(validateEan('4006381333931', 'ean13').valid).toBe(true);
+    expect(validateEan('4006381333932', 'ean13').valid).toBe(false);
+    expect(validateEan('96385074', 'ean8').valid).toBe(true);
+  });
+  it('parses SSCC with optional symbology identifier', () => {
+    expect(parseGs1(']C100106141412345678908').ai).toEqual([{ ai: '00', value: '106141412345678908' }]);
+  });
+  it('accepts every valid GS1 parser reference vector', () => {
+    for (const vector of vectors.parse_valid) {
+      expect(parseGs1(vector.input).ai, vector.note).toEqual(vector.ai);
+    }
+  });
+  it('rejects every invalid GS1 parser reference vector with the expected error', () => {
+    for (const vector of vectors.parse_invalid) {
+      expect(() => parseGs1(vector.input), vector.input).toThrow(vector.expected_error);
+    }
+  });
+  it('keeps GS separators between variable-length fields', () => {
+    const parsed = parseGs1('10LOT42\u001d21SN0001');
+    expect(parsed.ai).toEqual([{ ai: '10', value: 'LOT42' }, { ai: '21', value: 'SN0001' }]);
+  });
+  it('rejects ambiguous GS1 input when a separator is missing', () => {
+    expect(() => parseGs1('10LOT4221SN0001')).toThrow('AMBIGUOUS_GS');
+  });
+  it('rejects invalid check digits and unknown AIs', () => {
+    expect(() => parseGs1('(00)106141412345678909')).toThrow('BAD_CHECK_DIGIT');
+    expect(() => parseGs1('(88)ABC')).toThrow('UNKNOWN_AI');
+  });
+  it('filters a non-selected barcode format without showing an error', () => {
+    expect(validateScan({ value: '4006381333931', type: 'qr', format: 'EAN_13' })).toEqual({ accepted: false, ignored: true });
+  });
+  it('accepts valid EAN and rejects bad checksum through the pipeline', () => {
+    const onResult = vi.fn();
+    const pipeline = createScanPipeline({ type: 'ean13', onResult, clock: () => 1000 });
+    expect(pipeline.accept({ value: '4006381333931', format: 'EAN_13' }).status).toBe('accepted');
+    expect(pipeline.accept({ value: '4006381333932', format: 'EAN_13' }).status).toBe('rejected');
+  });
+  it('applies per-value cooldown without dropping a different code', () => {
+    let now = 1000;
+    const onResult = vi.fn();
+    const pipeline = createScanPipeline({ type: 'code128', onResult, clock: () => now });
+    expect(pipeline.accept({ value: 'A-1', format: 'CODE_128' }).status).toBe('accepted');
+    expect(pipeline.accept({ value: 'A-1', format: 'CODE_128' }).status).toBe('cooldown');
+    expect(pipeline.accept({ value: 'B-2', format: 'CODE_128' }).status).toBe('accepted');
+    now += 801;
+    expect(pipeline.accept({ value: 'A-1', format: 'CODE_128' }).status).toBe('accepted');
+  });
+  it('uses a fake source to emit scans only while running', async () => {
+    const source = new FakeScanSource();
+    const listener = vi.fn();
+    source.subscribe(listener);
+    source.emit('ignored-before-start');
+    await source.start('ean13');
+    source.emit('4006381333931');
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({ value: '4006381333931', format: 'EAN_13' }));
+    await source.pause();
+    source.emit('ignored-while-paused');
+    expect(listener).toHaveBeenCalledTimes(1);
+    await source.resume();
+    source.emit('4006381333931');
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+});

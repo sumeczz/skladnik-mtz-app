@@ -1,9 +1,8 @@
 # Skladník MTZ – mobilní webová aplikace
 
-Offline-first PWA pro skladníka: kontinuální skenování čárových kódů, automatické dělení skenů na palety a generování GS1-128/SSCC štítků. Zdrojový základ tvoří HTML, CSS a JavaScript; nativní Flutter projekt se nepoužívá.
+Offline-first PWA pro skladníka: kontinuální skenování čárových kódů, automatické dělení skenů na palety a generování GS1-128/SSCC štítků. Technologie: HTML, CSS, JavaScript ES modules, Vite, IndexedDB a Vitest.
 
 ## Spuštění
-
 Vyžaduje Node.js a npm.
 
 ```powershell
@@ -11,10 +10,9 @@ npm install
 npm run dev
 ```
 
-V terminálu Vite vypíše lokální adresu, typicky `http://localhost:5173`. Pro otevření na jiném zařízení ve stejné síti lze použít `npm run dev -- --host 0.0.0.0`. Kamera a service worker mimo localhost vyžadují HTTPS.
+Vite vypíše lokální adresu, typicky http://localhost:5173. Pro telefon ve stejné síti lze použít npm run dev -- --host 0.0.0.0; kamera na jiném zařízení vyžaduje HTTPS origin.
 
 ## Kontroly
-
 ```powershell
 npm test
 npm run build
@@ -22,13 +20,13 @@ npm audit --omit=optional
 python tools/gs1_reference.py --selftest
 ```
 
-## Stav
+## Stav milníků
+- M0: responzivní shell, IndexedDB schema v1, manifest, service worker.
+- M1: výběr osmi typů kódů, ZXing kamera, ruční zadání, EAN/GS1 validace, cooldown a dočasný seznam skenů.
+- M2: ukládání skenů do IndexedDB, palety a atomické dělení po N.
 
-M0 tvoří responzivní domovskou obrazovku, lokální IndexedDB verze 1, základní PWA manifest/service worker a automatické testy storage. Tlačítko skenování zatím neaktivuje kameru; skutečné skenování je plánováno do M1. Offline mód a instalace PWA se musí ověřit v mobilním prohlížeči.
-
-## Důležité
-
-- Data zůstávají v prohlížeči zařízení; neexistuje backend ani automatická synchronizace.
-- IndexedDB data mohou být odstraněna vymazáním dat prohlížeče; export/záloha přijde v pozdějším milníku.
-- Žádné reálné SSCC štítky neopouštějí testovací prostředí bez přiděleného GS1 Company Prefix.
-- Projektové instrukce a rozhodnutí jsou v `AGENTS.md`, `docs/` a `prompts/`.
+## Omezení
+- V M1 jsou skeny jen v paměti aktivní stránky; obnovením stránky se smažou.
+- Kameru a skutečné GS separátory je nutné ověřit na fyzickém telefonu; checklist je v docs/field-tests.md.
+- Kamera a service worker vyžadují HTTPS nebo localhost.
+- Data zůstávají v zařízení; žádný backend ani automatická synchronizace.

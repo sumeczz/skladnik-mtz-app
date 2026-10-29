@@ -1,55 +1,50 @@
 # 08 – Testovací strategie
 
-## Pyramida
+## Pyramida testů
 
 | Úroveň | Co | Nástroj | Kde |
 |---|---|---|---|
-| Jednotkové (většina) | GS1 (kontrolní číslice, SSCC, parser), validátory typů, pravidla duplicit, dělení palet | `flutter test` / `dart test` | `test/core/`, `test/features/*/domain/` |
-| Repozitáře (DB) | transakce, invarianty, migrace | drift in-memory DB | `test/features/*/data/` |
-| Widget | obrazovky s `FakeScanSource`, banner, počítadlo | `flutter_test` | `test/features/*/presentation/` |
-| Integrační | celý tok: výběr typu → N skenů → uzavření → štítek | `integration_test` | `integration_test/` |
-| Golden | vzhled štítku / PDF (stabilní rozměry) | golden testy | `test/goldens/` |
-| **Terén** | reálné štítky, reálný telefon, reálné světlo | ruční checklist níže | – |
+| Jednotkové | GS1, kontrolní číslice, parser, validátory, cooldown | Vitest | tests/ |
+| Repozitáře | IndexedDB transakce, schéma a migrace | Vitest + fake-indexeddb | tests/storage.test.js |
+| Pipeline | výběr formátu, EAN, GS1, ruční vstup, FakeScanSource | Vitest | tests/scanning.test.js |
+| Integrační | výběr typu → sken → feedback → seznam | prohlížeč / budoucí automatizace | manuální + budoucí testy |
+| Terén | skutečné štítky, telefon, světlo, kamera | checklist | docs/field-tests.md |
 
-## Povinné testy (bez nich milník není hotový)
+## Automatické testy M1
 
-- **GS1 vektory**: každý záznam z `docs/test-vectors/gs1_vectors.json` (zkopíruj do `test/fixtures/`). Změna logiky bez změny vektorů je podezřelá.
-- **Dělení palet**: N=1, N=3, N=max, bez limitu; dělení přesně na hranici; 100 skenů v řadě → správný počet palet a pořadí; souběh dvou událostí téhož kódu.
-- **Atomicita**: simulovaná chyba uprostřed transakce uzavření → stav se vrátí (žádná paleta bez SSCC, žádný sken bez palety).
-- **SSCC**: unikátnost přes 10 000 uzavření; čítač přežije restart; nikdy se nevrací při undo.
-- **Duplicity**: všechny kombinace `DuplicatePolicy × DuplicateScope`, včetně „Přidat přesto".
-- **Obnova po pádu**: DB s otevřenou paletou → start aplikace → stav stejný.
-- **Round-trip štítku**: `parse(render(sscc)) == sscc` (generování → dekódování obrazu, pokud to nástroje dovolí; jinak ruční test v terénu).
+- Všechny položky check_digit, parse_valid a parse_invalid v docs/test-vectors/gs1_vectors.json.
+- EAN-13/EAN-8: délka a kontrolní číslice.
+- Formát mimo výběr se tiše ignoruje.
+- Cooldown 800 ms je per hodnota; jiné hodnoty projdou bez čekání.
+- GS separator U+001D se zachová v parseru; rozpoznatelně nejednoznačné GS1 bez separatoru je odmítnuto.
+- FakeScanSource emituje pouze při spuštění a podporuje pauzu/obnovení.
 
-## FakeScanSource
+## Povinné terénní testy
 
-Pro všechny testy skenování používej `FakeScanSource implements ScanSource` s řízeným streamem (`emit(RawScan)`),
-ne kameru. Díky tomu jde napsat „naskenuj 7 kódů" v 5 řádcích a test běží v milisekundách.
+Vyplň docs/field-tests.md. Testy níže jsou dosud neprovedené, dokud je někdo neověří na fyzickém telefonu:
 
-## Terénní checklist (před každým vydáním)
-
-Pro každý podporovaný typ kódu vyzkoušej alespoň tyto situace a zapiš výsledek do `docs/field-tests.md` (zakládá se při prvním testu):
-
-| Situace | Výsledek (OK / pomalé / selhalo) |
+| Situace | Co ověřit |
 |---|---|
-| Čistý štítek, 20 cm, dobré světlo | |
-| Štítek v rukavici ve 40 cm | |
-| Zmačkaný / poškrábaný štítek | |
-| Lesklý štítek (odlesk) | |
-| Slabé světlo + svítilna | |
-| Kód na displeji (jiný telefon / monitor) | |
-| Malý kód (< 20 mm široký) | |
-| Dlouhý Code 128 (> 20 znaků) | |
-| GS1-128 se dvěma proměnlivými poli (kontrola GS separátoru, riziko R-01) | |
-| 30 kódů za sebou bez doteku (kontinuální režim) | |
-| Držení kamery 3 s na jednom kódu (musí se uložit jen jednou) | |
-| Násilné ukončení aplikace po 2. skenu z 3 | |
-| Zámek obrazovky a návrat | |
-| Přerušení telefonním hovorem | |
+| Čistý štítek, 20 cm, dobré světlo | správná hodnota |
+| Rukavice / 40 cm / slabé světlo | použitelnost |
+| Poškrábaný nebo lesklý štítek | spolehlivost |
+| Kód na jiném displeji | detekce |
+| GS1-128 se dvěma proměnlivými poli | zachování GS (ASCII 29 / U+001D) |
+| 30 kódů za sebou bez doteku | kontinuální režim |
+| Držení stejného kódu 3 sekundy | jen jeden přijatý sken |
+| Pauza, skrytí karty, návrat z hovoru | kamera se uvolní a obnoví |
+| Odepřené oprávnění kamery | srozumitelná chyba, žádný pád |
+| Svítilna | funguje na podporovaném telefonu |
 
-Měř čas „kód v záběru → vibrace" stopkami alespoň 10× a zapiš medián.
+Měř čas „kód v záběru → potvrzovací signál“ alespoň 10× a zapiš medián. Automatické testy nedokazují rychlost kamery ani zachování GS.
 
-## Kvalita kódu
+## Příkazy
 
-`flutter analyze` bez varování, `dart format --set-exit-if-changed .`, žádný `print` v produkčním kódu (použij logger), pokrytí
-doménových složek ≥ 85 % (měř `flutter test --coverage`, ale pokrytí není cíl samo o sobě).
+```powershell
+npm test
+npm run build
+npm audit --omit=optional
+python tools/gs1_reference.py --selftest
+```
+
+Před každým milníkem musí automatické testy a build projít. Před vydáním je povinný terénní test a kontrola dat po násilném ukončení aplikace.
