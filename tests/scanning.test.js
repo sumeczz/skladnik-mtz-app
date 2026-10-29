@@ -48,13 +48,28 @@ describe('barcode validation', () => {
   it('applies per-value cooldown without dropping a different code', () => {
     let now = 1000;
     const onResult = vi.fn();
-    const pipeline = createScanPipeline({ type: 'code128', onResult, clock: () => now });
+    const pipeline = createScanPipeline({ type: 'code128', onResult, clock: () => now, cooldownMs: 800 });
     expect(pipeline.accept({ value: 'A-1', format: 'CODE_128' }).status).toBe('accepted');
     expect(pipeline.accept({ value: 'A-1', format: 'CODE_128' }).status).toBe('cooldown');
     expect(pipeline.accept({ value: 'B-2', format: 'CODE_128' }).status).toBe('accepted');
     now += 801;
     expect(pipeline.accept({ value: 'A-1', format: 'CODE_128' }).status).toBe('accepted');
   });
+  it('ignores repeated reads of the same code for 2.5 seconds by default', () => {
+    let now = 1000;
+    const onResult = vi.fn();
+    const pipeline = createScanPipeline({ type: 'code128', onResult, clock: () => now });
+    expect(pipeline.accept({ value: 'TOP', format: 'CODE_128' }).status).toBe('accepted');
+    now += 300;
+    expect(pipeline.accept({ value: 'MIDDLE', format: 'CODE_128' }).status).toBe('accepted');
+    now += 300;
+    expect(pipeline.accept({ value: 'TOP', format: 'CODE_128' }).status).toBe('cooldown');
+    expect(pipeline.accept({ value: 'BOTTOM', format: 'CODE_128' }).status).toBe('accepted');
+    now += 2200;
+    expect(pipeline.accept({ value: 'TOP', format: 'CODE_128' }).status).toBe('accepted');
+    expect(onResult.mock.calls.map(([result]) => result.value)).toEqual(['TOP', 'MIDDLE', 'BOTTOM', 'TOP']);
+  });
+
   it('uses a fake source to emit scans only while running', async () => {
     const source = new FakeScanSource();
     const listener = vi.fn();

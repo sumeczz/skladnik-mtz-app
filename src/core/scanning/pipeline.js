@@ -172,7 +172,7 @@ export function validateScan({ value, type, format }) {
   return { accepted: true, value: normalized };
 }
 
-export function createScanPipeline({ type, onResult, clock = () => Date.now(), cooldownMs = 800 }) {
+export function createScanPipeline({ type, onResult, clock = () => Date.now(), cooldownMs = 2500 }) {
   const lastAccepted = new Map();
   return {
     accept(rawScan) {

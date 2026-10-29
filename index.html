@@ -78,6 +78,7 @@
           </div>
           <div class="camera-frame" aria-label="Celá plocha kamery se používá ke skenování">
             <video id="camera-video" playsinline muted autoplay aria-label="Náhled kamery – skenuje se celý obraz"></video>
+            <div id="scan-reticle" class="scan-reticle" aria-hidden="true"><span></span></div>
             <div id="camera-placeholder" class="camera-placeholder"><span class="camera-placeholder-icon">▣</span><strong id="camera-status-title">Kamera se připravuje</strong><p id="camera-status-detail">Povol přístup ke kameře, pokud se prohlížeč zeptá.</p></div>
           </div>
           <div class="scan-stats">
@@ -86,6 +87,7 @@
           </div>
           <p id="scan-notice" class="notice" role="status" aria-live="polite">Celý obraz kamery je aktivní skenovací plocha. Není potřeba mířit do rámečku.</p>
           <div class="scan-actions">
+            <button id="reticle-toggle" class="button button-secondary" type="button" aria-pressed="false">Zobrazit zaměřovací pole</button>
             <button id="pause-camera" class="button button-secondary" type="button">Ⅱ Pozastavit</button>
             <button id="manual-entry" class="button button-secondary" type="button">⌨ Ručně</button>
             <button id="undo-scan" class="button button-secondary" type="button" disabled>↶ Vrátit</button>
@@ -113,6 +115,11 @@
           <section class="recent-scans" aria-labelledby="pallet-history-title">
             <div class="section-heading"><h2 id="pallet-history-title">Historie palet</h2><span class="section-note">Nejnovější nahoře</span></div>
             <ol id="pallet-list" class="pallet-list"><li class="empty-list">Zatím nejsou žádné palety.</li></ol>
+            <section id="pallet-detail" class="pallet-detail" hidden aria-live="polite">
+              <div class="section-heading"><h2 id="pallet-detail-title">Kódy palety</h2><button id="pallet-detail-close" class="button button-secondary" type="button">Skrýt kódy</button></div>
+              <p id="pallet-detail-meta" class="screen-copy"></p>
+              <ol id="pallet-code-list" class="recent-list"></ol>
+            </section>
           </section>
         </section>
 

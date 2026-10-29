@@ -191,3 +191,23 @@ h2 { margin: 0; font-size: 22px; letter-spacing: -.7px; } .section-note { color:
 
 .scan-actions .button-secondary { color: var(--ink); background: #fff; border-color: var(--line); }
 .scan-actions .button-secondary:hover { background: #f0f4ef; }
+
+/* M3 usability: optional aiming guide and readable pallet details */
+.scan-reticle { display: block !important; opacity: 0; visibility: hidden; transition: opacity .15s ease; }
+.scan-reticle.scan-reticle-visible { opacity: 1; visibility: visible; }
+.scan-reticle { width: min(82%, 420px); height: 118px; border-color: rgb(218 255 220 / 92%); box-shadow: 0 0 0 999px rgb(0 0 0 / 24%); }
+.scan-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.scan-actions #reticle-toggle { grid-column: 1 / -1; }
+.pallet-view-codes { width: auto; min-height: 40px; padding: 0 12px; white-space: nowrap; font-size: 11px; }
+.pallet-detail { margin-top: 24px; padding: 18px; border: 1px solid #cfe0d1; border-radius: 18px; background: #f7faf6; scroll-margin-top: 18px; }
+.pallet-detail .section-heading { gap: 12px; }
+.pallet-detail .section-heading h2 { margin: 0; }
+.pallet-detail .section-heading .button { width: auto; min-height: 40px; padding: 0 12px; white-space: nowrap; }
+.pallet-detail .screen-copy { margin: 10px 0 16px; font-size: 12px; }
+.pallet-list-item { flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .scan-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pallet-list-item { gap: 10px; }
+  .pallet-view-codes { width: 100%; }
+  .pallet-detail { padding: 13px; }
+}

@@ -20,6 +20,8 @@ let pallets = [];
 let activePallet = null;
 let palletCapacity = 40;
 let savingScan = false;
+let selectedPalletDetailId = null;
+let reticleVisible = false;
 
 function announce(message) {
   const target = byId('home-message');
@@ -191,8 +193,47 @@ function renderPalletList() {
     const status = document.createElement('span');
     status.className = `pallet-status ${pallet.status === 'open' ? 'pallet-status-open' : ''}`;
     status.textContent = pallet.status === 'open' ? 'Otevřená' : 'Uzavřená';
+    const viewCodes = document.createElement('button');
+    viewCodes.type = 'button';
+    viewCodes.className = 'button button-secondary pallet-view-codes';
+    viewCodes.dataset.palletId = String(pallet.id);
+    viewCodes.textContent = selectedPalletDetailId === pallet.id ? 'Zobrazeno' : 'Zobrazit kódy';
+    viewCodes.setAttribute('aria-expanded', String(selectedPalletDetailId === pallet.id));
     details.append(title, meta);
-    item.append(details, status);
+    item.append(details, status, viewCodes);
+    list.append(item);
+  }
+  renderPalletDetail();
+}
+
+function renderPalletDetail() {
+  const panel = byId('pallet-detail');
+  const list = byId('pallet-code-list');
+  if (!panel || !list) return;
+  const pallet = pallets.find((item) => item.id === selectedPalletDetailId);
+  panel.hidden = !pallet;
+  list.replaceChildren();
+  if (!pallet) return;
+  byId('pallet-detail-title').textContent = `Kódy palety ${pallet.number}`;
+  byId('pallet-detail-meta').textContent = `${pallet.scans.length} načtených kódů · založena ${new Date(pallet.createdAt).toLocaleString('cs-CZ')}`;
+  if (!pallet.scans.length) {
+    const empty = document.createElement('li');
+    empty.className = 'empty-list';
+    empty.textContent = 'Tato paleta zatím nemá žádné kódy.';
+    list.append(empty);
+    return;
+  }
+  for (const [index, scan] of pallet.scans.entries()) {
+    const item = document.createElement('li');
+    item.className = 'recent-scan-item';
+    const body = document.createElement('div');
+    body.className = 'recent-scan-body';
+    const value = document.createElement('strong');
+    value.textContent = scan.value;
+    const meta = document.createElement('small');
+    meta.textContent = `#${pallet.scans.length - index} · ${CODE_TYPES[scan.type]?.label ?? scan.type} · ${new Date(scan.scannedAt).toLocaleString('cs-CZ')}`;
+    body.append(value, meta);
+    item.append(body);
     list.append(item);
   }
 }
@@ -311,6 +352,16 @@ byId('code-type-options').addEventListener('click', (event) => {
   if (button) selectType(button.dataset.codeType);
 });
 byId('pause-camera').addEventListener('click', togglePause);
+byId('reticle-toggle').addEventListener('click', () => {
+  reticleVisible = !reticleVisible;
+  byId('scan-reticle').classList.toggle('scan-reticle-visible', reticleVisible);
+  byId('reticle-toggle').setAttribute('aria-pressed', String(reticleVisible));
+  byId('reticle-toggle').textContent = reticleVisible ? 'Skrýt zaměřovací pole' : 'Zobrazit zaměřovací pole';
+  byId('scan-notice').className = 'notice';
+  byId('scan-notice').textContent = reticleVisible
+    ? 'Zaměřovací pole je pouze vizuální pomůcka. Skenování stále probíhá přes celý obraz kamery.'
+    : 'Celý obraz kamery je aktivní skenovací plocha. Není potřeba mířit do rámečku.';
+});
 byId('torch-toggle').addEventListener('click', async () => {
   try {
     if (!cameraSource) throw new Error('Nejdřív spusť kameru.');
@@ -365,6 +416,18 @@ byId('pallets-back').addEventListener('click', () => showScreen('home'));
 byId('nav-home').addEventListener('click', () => showScreen('home'));
 byId('brand-home').addEventListener('click', (event) => { event.preventDefault(); showScreen('home'); });
 byId('nav-pallets').addEventListener('click', async () => { await refreshPalletState(); showScreen('pallets'); });
+byId('pallet-list').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-pallet-id]');
+  if (!button) return;
+  const id = Number(button.dataset.palletId);
+  selectedPalletDetailId = selectedPalletDetailId === id ? null : id;
+  renderPalletList();
+  if (selectedPalletDetailId !== null) byId('pallet-detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+byId('pallet-detail-close').addEventListener('click', () => {
+  selectedPalletDetailId = null;
+  renderPalletList();
+});
 byId('close-pallet').addEventListener('click', async () => {
   try {
     const closed = await closeActivePallet();
