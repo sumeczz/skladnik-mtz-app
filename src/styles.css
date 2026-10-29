@@ -220,3 +220,9 @@ h2 { margin: 0; font-size: 22px; letter-spacing: -.7px; } .section-note { color:
 .pallet-view-codes { color: var(--ink); background: #fff; border-color: var(--line); }
 .pallet-view-codes:hover { background: #f0f4ef; }
 
+
+.pallet-generated-barcode { display: grid; gap: 6px; width: 100%; min-width: 0; margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.pallet-generated-barcode > small { color: var(--muted); font-size: 11px; }
+.pallet-generated-barcode svg { display: block; width: 100%; max-width: 100%; height: auto; max-height: 110px; }
+.pallet-generated-barcode-error { color: #8d2c22; background: #fff8f6; }
+

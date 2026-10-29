@@ -2,6 +2,7 @@ import './styles.css';
 import { openDatabase, getDashboardSummary, getSetting, saveSetting } from './storage/db.js';
 import { CameraScanSource } from './core/scanning/camera.js';
 import { CODE_TYPES, createScanPipeline } from './core/scanning/pipeline.js';
+import JsBarcode from 'jsbarcode';
 import { addScanToPallet, closeActivePallet, listPallets, undoLastScan } from './core/scanning/pallet-store.js';
 
 const byId = (id) => document.getElementById(id);
@@ -234,6 +235,25 @@ function renderPalletDetail() {
     meta.textContent = `#${pallet.scans.length - index} · ${CODE_TYPES[scan.type]?.label ?? scan.type} · ${new Date(scan.scannedAt).toLocaleString('cs-CZ')}`;
     body.append(value, meta);
     item.append(body);
+
+    const barcodePanel = document.createElement('div');
+    barcodePanel.className = 'pallet-generated-barcode';
+    const barcodeLabel = document.createElement('small');
+    barcodeLabel.textContent = `Vygenerovaný čárový kód · ${CODE_TYPES[scan.type]?.label ?? scan.type}`;
+    const barcode = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    barcode.setAttribute('role', 'img');
+    barcode.setAttribute('aria-label', `Čárový kód ${scan.value}`);
+    barcodePanel.append(barcodeLabel, barcode);
+    try {
+      const format = ['code128', 'gs1128'].includes(scan.type) ? 'CODE128' : null;
+      if (!format) throw new Error('Pro tento typ zatím není generování dostupné.');
+      JsBarcode(barcode, scan.value, { format, displayValue: true, height: 54, margin: 8, fontSize: 13, background: '#ffffff', lineColor: '#17231a', width: 2 });
+    } catch {
+      barcodePanel.classList.add('pallet-generated-barcode-error');
+      barcodeLabel.textContent = 'Čárový kód nelze pro tuto hodnotu vygenerovat.';
+      barcode.remove();
+    }
+    item.append(barcodePanel);
     list.append(item);
   }
 }
