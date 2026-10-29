@@ -1,0 +1,19 @@
+{
+  "name": "skladnik-mtz-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Offline-first mobilní webová aplikace pro skladníka MTZ",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "fake-indexeddb": "^6.2.6",
+    "vite": "^7.1.12",
+    "vitest": "^5.0.5"
+  }
+}

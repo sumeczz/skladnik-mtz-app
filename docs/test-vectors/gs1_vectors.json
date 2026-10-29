@@ -1,0 +1,265 @@
+{
+  "_comment": "Generov\u00e1no tools/gs1_reference.py. Neupravuj ru\u010dn\u011b.",
+  "check_digit": [
+    {
+      "payload": "400638133393",
+      "expected": "1",
+      "note": "EAN-13 4006381333931 (ve\u0159ejn\u011b zn\u00e1m\u00fd p\u0159\u00edklad)"
+    },
+    {
+      "payload": "590123412345",
+      "expected": "7",
+      "note": "EAN-13 5901234123457 (ve\u0159ejn\u011b zn\u00e1m\u00fd p\u0159\u00edklad)"
+    },
+    {
+      "payload": "950110153000",
+      "expected": "3",
+      "note": "GTIN-13 9501101530003 (vzorov\u00fd GS1 p\u0159\u00edklad)"
+    },
+    {
+      "payload": "0950110153000",
+      "expected": "3",
+      "note": "GTIN-14 s \u00favodn\u00ed nulou: 09501101530003"
+    },
+    {
+      "payload": "10614141234567890",
+      "expected": "8",
+      "note": "SSCC payload (17 \u010d\u00edslic)"
+    },
+    {
+      "payload": "00000000000000000",
+      "expected": "0",
+      "note": "sam\u00e9 nuly"
+    }
+  ],
+  "sscc_build": [
+    {
+      "extension": 1,
+      "company_prefix": "0614141",
+      "serial": 234567890,
+      "expected": "106141412345678908",
+      "note": "prefix 7 \u010d\u00edslic, serial 9 \u010d\u00edslic"
+    },
+    {
+      "extension": 0,
+      "company_prefix": "8591234",
+      "serial": 1,
+      "expected": "085912340000000017",
+      "note": "FIKTIVN\u00cd prefix, serial 1"
+    },
+    {
+      "extension": 3,
+      "company_prefix": "85912345678",
+      "serial": 1,
+      "expected": "385912345678000018",
+      "note": "prefix 11 \u010d\u00edslic, serial 5 \u010d\u00edslic"
+    },
+    {
+      "extension": 9,
+      "company_prefix": "859123456",
+      "serial": 9999999,
+      "expected": "985912345699999997",
+      "note": "prefix 9 \u010d\u00edslic, serial 7 \u010d\u00edslic"
+    }
+  ],
+  "sscc_build_errors": [
+    {
+      "extension": 1,
+      "company_prefix": "0614141",
+      "serial": 1000000000,
+      "expected_error": "SERIAL_OVERFLOW"
+    },
+    {
+      "extension": 10,
+      "company_prefix": "0614141",
+      "serial": 1,
+      "expected_error": "BAD_EXTENSION"
+    },
+    {
+      "extension": 1,
+      "company_prefix": "12345",
+      "serial": 1,
+      "expected_error": "BAD_PREFIX"
+    }
+  ],
+  "parse_valid": [
+    {
+      "input": "(00)106141412345678908",
+      "note": "SSCC v lidsky \u010diteln\u00e9m z\u00e1pisu",
+      "ai": [
+        {
+          "ai": "00",
+          "value": "106141412345678908"
+        }
+      ],
+      "element_string": "00106141412345678908",
+      "human_readable": "(00)106141412345678908"
+    },
+    {
+      "input": "00106141412345678908",
+      "note": "SSCC jako element string",
+      "ai": [
+        {
+          "ai": "00",
+          "value": "106141412345678908"
+        }
+      ],
+      "element_string": "00106141412345678908",
+      "human_readable": "(00)106141412345678908"
+    },
+    {
+      "input": "]C100106141412345678908",
+      "note": "SSCC s prefixem symbology identifier ]C1",
+      "ai": [
+        {
+          "ai": "00",
+          "value": "106141412345678908"
+        }
+      ],
+      "element_string": "00106141412345678908",
+      "human_readable": "(00)106141412345678908"
+    },
+    {
+      "input": "01095011015300031714070410AB-123",
+      "note": "GTIN + expirace + \u0161ar\u017ee (\u0161ar\u017ee na konci, bez GS)",
+      "ai": [
+        {
+          "ai": "01",
+          "value": "09501101530003"
+        },
+        {
+          "ai": "17",
+          "value": "140704"
+        },
+        {
+          "ai": "10",
+          "value": "AB-123"
+        }
+      ],
+      "element_string": "01095011015300031714070410AB-123",
+      "human_readable": "(01)09501101530003(17)140704(10)AB-123"
+    },
+    {
+      "input": "(01)09501101530003(17)261231(10)LOT-7(21)SN9",
+      "note": "lidsky \u010diteln\u00fd z\u00e1pis, dv\u011b prom\u011bnliv\u00e1 pole",
+      "ai": [
+        {
+          "ai": "01",
+          "value": "09501101530003"
+        },
+        {
+          "ai": "17",
+          "value": "261231"
+        },
+        {
+          "ai": "10",
+          "value": "LOT-7"
+        },
+        {
+          "ai": "21",
+          "value": "SN9"
+        }
+      ],
+      "element_string": "01095011015300031726123110LOT-7\u001d21SN9",
+      "human_readable": "(01)09501101530003(17)261231(10)LOT-7(21)SN9"
+    },
+    {
+      "input": "10LOT42\u001d21SN0001",
+      "note": "dv\u011b prom\u011bnliv\u00e1 pole odd\u011blen\u00e1 GS",
+      "ai": [
+        {
+          "ai": "10",
+          "value": "LOT42"
+        },
+        {
+          "ai": "21",
+          "value": "SN0001"
+        }
+      ],
+      "element_string": "10LOT42\u001d21SN0001",
+      "human_readable": "(10)LOT42(21)SN0001"
+    },
+    {
+      "input": "(3103)001500",
+      "note": "\u010dist\u00e1 hmotnost 1,500 kg (AI 3103)",
+      "ai": [
+        {
+          "ai": "3103",
+          "value": "001500"
+        }
+      ],
+      "element_string": "3103001500",
+      "human_readable": "(3103)001500"
+    },
+    {
+      "input": "(400)PO-2026-001(90)INT-A",
+      "note": "\u010d\u00edslo objedn\u00e1vky + intern\u00ed informace",
+      "ai": [
+        {
+          "ai": "400",
+          "value": "PO-2026-001"
+        },
+        {
+          "ai": "90",
+          "value": "INT-A"
+        }
+      ],
+      "element_string": "400PO-2026-001\u001d90INT-A",
+      "human_readable": "(400)PO-2026-001(90)INT-A"
+    },
+    {
+      "input": "(17)260200",
+      "note": "DD=00 = posledn\u00ed den v m\u011bs\u00edci je povoleno",
+      "ai": [
+        {
+          "ai": "17",
+          "value": "260200"
+        }
+      ],
+      "element_string": "17260200",
+      "human_readable": "(17)260200"
+    }
+  ],
+  "parse_invalid": [
+    {
+      "input": "(00)106141412345678909",
+      "expected_error": "BAD_CHECK_DIGIT"
+    },
+    {
+      "input": "(01)0950110153000",
+      "expected_error": "BAD_LENGTH"
+    },
+    {
+      "input": "(17)261331",
+      "expected_error": "BAD_DATE"
+    },
+    {
+      "input": "(10)AAAAAAAAAAAAAAAAAAAAA",
+      "expected_error": "TOO_LONG"
+    },
+    {
+      "input": "(88)ABC",
+      "expected_error": "UNKNOWN_AI"
+    },
+    {
+      "input": "(11)26AB01",
+      "expected_error": "NON_NUMERIC"
+    },
+    {
+      "input": "(10)AB^CD",
+      "expected_error": "BAD_CHARSET"
+    },
+    {
+      "input": "(10)A(10)B",
+      "expected_error": "DUPLICATE_AI"
+    },
+    {
+      "input": "(10)",
+      "expected_error": "EMPTY_VALUE"
+    },
+    {
+      "input": "",
+      "expected_error": "EMPTY"
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="cs">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#10251c" />
+    <meta name="color-scheme" content="light" />
+    <meta name="description" content="Offline-first mobilní aplikace pro evidenci skladových skenů a palet." />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <title>Skladník MTZ</title>
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Skladník MTZ – domů">
+          <span class="brand-mark" aria-hidden="true">S</span>
+          <span><strong>Skladník MTZ</strong><small>Evidence skladových skenů</small></span>
+        </a>
+        <div id="connection-status" class="connection-status" role="status" aria-live="polite">
+          <span class="status-dot" aria-hidden="true"></span><span>Kontrola úložiště…</span>
+        </div>
+      </header>
+      <main id="main-content" class="main-content">
+        <section class="hero" aria-labelledby="home-title">
+          <div class="eyebrow"><span class="eyebrow-dot"></span> OFFLINE-FIRST · M0</div>
+          <h1 id="home-title">Sklad pod kontrolou.</h1>
+          <p class="hero-copy">Základ pro rychlé a spolehlivé skenování. Data zůstávají v tomto zařízení.</p>
+          <div class="hero-actions">
+            <button id="start-scan" class="button button-primary button-large" type="button"><span class="button-icon" aria-hidden="true">▦</span> Skenovat <span class="button-arrow" aria-hidden="true">→</span></button>
+            <button id="open-settings" class="button button-secondary button-large" type="button">Nastavení <span aria-hidden="true">↗</span></button>
+          </div>
+          <p id="home-message" class="inline-notice" aria-live="polite">Základ aplikace je připraven. Čtečka bude doplněna v milníku M1.</p>
+        </section>
+        <section class="section-block" aria-labelledby="overview-title">
+          <div class="section-heading"><div><p class="section-kicker">PŘEHLED</p><h2 id="overview-title">Pracovní plocha</h2></div><span class="section-note">Tento telefon</span></div>
+          <div class="stats-grid">
+            <article class="stat-card"><span class="stat-label">Celkem palet</span><strong id="pallet-count" class="stat-value">—</strong><span class="stat-caption">Uloženo lokálně</span></article>
+            <article class="stat-card"><span class="stat-label">Otevřená paleta</span><strong id="open-pallet" class="stat-value">—</strong><span class="stat-caption">Aktuální pracovní dávka</span></article>
+            <article class="stat-card stat-card-accent"><span class="stat-label">Režim aplikace</span><strong class="stat-value stat-text">Offline</strong><span class="stat-caption">Bez účtu a cloudu</span></article>
+          </div>
+        </section>
+        <section class="section-block setup-section" aria-labelledby="setup-title">
+          <div class="section-heading"><div><p class="section-kicker">ZÁKLAD PROVOZU</p><h2 id="setup-title">Připraveno po krocích</h2></div></div>
+          <div class="setup-list">
+            <article class="setup-item"><span class="setup-check" aria-hidden="true">✓</span><div><strong>Lokální úložiště</strong><p>IndexedDB – palety, skeny a nastavení v zařízení.</p></div><span class="setup-state" id="storage-state">Kontrola…</span></article>
+            <article class="setup-item"><span class="setup-check setup-pending" aria-hidden="true">02</span><div><strong>Čtečka kódů</strong><p>Výběr typu, kamera a ruční zadání v M1.</p></div><span class="setup-state setup-state-pending">M1</span></article>
+            <article class="setup-item"><span class="setup-check setup-pending" aria-hidden="true">03</span><div><strong>Správa palet a GS1-128</strong><p>Atomické ukládání a SSCC navážou v dalších milnících.</p></div><span class="setup-state setup-state-pending">M2–M3</span></article>
+          </div>
+        </section>
+      </main>
+      <footer class="footer"><span>SKLADNÍK MTZ</span><span id="app-version">M0 · Webová aplikace</span><span>Data zůstávají v zařízení</span></footer>
+      <nav class="bottom-nav" aria-label="Hlavní navigace">
+        <button type="button" class="nav-item nav-item-active" aria-current="page" id="nav-home"><span aria-hidden="true">⌂</span><span>Domů</span></button>
+        <button type="button" class="nav-item" id="nav-pallets"><span aria-hidden="true">▤</span><span>Palety</span></button>
+        <button type="button" class="nav-item" id="nav-settings"><span aria-hidden="true">⚙</span><span>Nastavení</span></button>
+      </nav>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
