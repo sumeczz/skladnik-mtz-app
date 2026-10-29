@@ -31,116 +31,119 @@ export function validateEan(value, type) {
   return { valid: true };
 }
 
-const FIXED_AI = new Map([
-  ['00', 18], ['01', 14], ['02', 14], ['11', 6], ['13', 6], ['15', 6], ['17', 6],
-  ['20', 2], ['410', 13], ['422', 3], ['7001', 13], ['8005', 6],
-]);
-const VARIABLE_AI = new Map([
-  ['10', 20], ['21', 20], ['30', 8], ['37', 8], ['240', 30], ['241', 30],
-  ['400', 30], ['401', 30], ['420', 20], ['421', 12], ['90', 30],
-  ...Array.from({ length: 9 }, (_, index) => ['' + (91 + index), 90]),
-]);
-const NUMERIC_AI = new Set(['00', '01', '02', '11', '13', '15', '17', '20', '30', '37', '410', '422', '7001', '8005']);
+import gs1AiRegistry from './gs1-ai-registry.json';
+
+const GS = String.fromCharCode(29);
+const AI_ENTRIES = Object.entries(gs1AiRegistry).sort(([a], [b]) => b.length - a.length);
 
 function identifyAi(input, offset) {
-  for (const length of [4, 3, 2]) {
-    const ai = input.slice(offset, offset + length);
-    if (FIXED_AI.has(ai) || VARIABLE_AI.has(ai)) return ai;
-    if (/^310[0-5]$/.test(ai)) return ai;
-  }
+  for (const [ai] of AI_ENTRIES) if (input.startsWith(ai, offset)) return ai;
   return null;
 }
-
+function fieldIsFixed(definition) { return definition.components.every((c) => c.fixedLength === true); }
+function fixedFieldLength(definition) { return definition.components.reduce((sum, c) => sum + (c.fixedLength ? c.length : 0), 0); }
+function validateDateComponent(format, value) {
+  let year, month, day;
+  if (['yymmd0', 'yymmdd', 'yymmddhh'].includes(format)) { year = 2000 + Number(value.slice(0, 2)); month = Number(value.slice(2, 4)); day = Number(value.slice(4, 6)); }
+  else if (format === 'yyyymmdd') { year = Number(value.slice(0, 4)); month = Number(value.slice(4, 6)); day = Number(value.slice(6, 8)); }
+  else return;
+  if (month < 1 || month > 12 || day < 0 || day > 31) throw new Error('BAD_DATE');
+  const maxDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (day === 0 ? format !== 'yymmd0' : day > maxDay) throw new Error('BAD_DATE');
+}
 function validateAiValue(ai, value) {
-  const fixedLength = FIXED_AI.get(ai) ?? (/^310[0-5]$/.test(ai) ? 6 : undefined);
-  const maxLength = fixedLength ?? VARIABLE_AI.get(ai);
-  if (fixedLength !== undefined && value.length !== fixedLength) throw new Error('BAD_LENGTH');
+  const def = gs1AiRegistry[ai];
+  if (!def) throw new Error('UNKNOWN_AI');
   if (!value.length) throw new Error('EMPTY_VALUE');
-  if (maxLength !== undefined && value.length > maxLength) throw new Error('TOO_LONG');
-  if (NUMERIC_AI.has(ai) || /^310[0-5]$/.test(ai)) {
-    if (!/^\d+$/.test(value)) throw new Error('NON_NUMERIC');
-  } else if (!/^[0-9A-Za-z!"%&'()*+,.\-/ :;<>?_=]+$/.test(value)) {
-    throw new Error('BAD_CHARSET');
+  if (fieldIsFixed(def) && value.length !== fixedFieldLength(def)) throw new Error('BAD_LENGTH');
+  let dateCursor = 0;
+  for (const component of def.components) {
+    if (component.optional && dateCursor >= value.length) continue;
+    const partLength = component.fixedLength ? component.length : value.length - dateCursor;
+    const part = value.slice(dateCursor, dateCursor + partLength);
+    if (component.type === 'N' && !/^\d+$/.test(part)) throw new Error('NON_NUMERIC');
+    if (component.format) validateDateComponent(component.format, part);
+    dateCursor += partLength;
   }
-  if (['00', '01', '02'].includes(ai)) {
-    if (calculateCheckDigit(value.slice(0, -1)) !== value.at(-1)) throw new Error('BAD_CHECK_DIGIT');
+  if (!new RegExp('^(?:' + def.regex + ')$').test(value)) {
+    const maxLength = Math.max(...def.components.map((c) => c.length));
+    if (value.length > maxLength) throw new Error('TOO_LONG');
+    if (def.components.every((c) => c.type === 'N') && !/^\d+$/.test(value)) throw new Error('NON_NUMERIC');
+    if (def.components.some((c) => c.type === 'X') && !/^[!%-?A-Z_a-z\\x22]+$/.test(value)) throw new Error('BAD_CHARSET');
+    throw new Error('BAD_FORMAT');
   }
-  if (['11', '13', '15', '17'].includes(ai)) {
-    if (!/^\d{6}$/.test(value)) throw new Error('NON_NUMERIC');
-    const yy = Number(value.slice(0, 2));
-    const month = Number(value.slice(2, 4));
-    const day = Number(value.slice(4, 6));
-    const year = 2000 + yy;
-    const days = day === 0 ? new Date(Date.UTC(year, month, 0)).getUTCDate() : new Date(Date.UTC(year, month - 1, day)).getUTCDate();
-    if (month < 1 || month > 12 || day > days || day < 0) throw new Error('BAD_DATE');
+  let cursor = 0;
+  for (const c of def.components) {
+    if (c.optional && cursor >= value.length) continue;
+    const length = c.fixedLength ? c.length : value.length - cursor;
+    const part = value.slice(cursor, cursor + length);
+    if (c.fixedLength && part.length !== c.length) throw new Error('BAD_LENGTH');
+    if (c.type === 'N' && !/^\d+$/.test(part)) throw new Error('NON_NUMERIC');
+    if (c.checkDigit && part.length > 1 && calculateCheckDigit(part.slice(0, -1)) !== part.at(-1)) throw new Error('BAD_CHECK_DIGIT');
+    if (c.format) validateDateComponent(c.format, part);
+    cursor += length;
   }
 }
-
+function makeParseResult(aiList) {
+  return { ai: aiList, humanReadable: aiList.map(({ ai, value }) => '(' + ai + ')' + value).join(''), elementString: aiList.map(({ ai, value }, i) => ai + value + (i < aiList.length - 1 && !fieldIsFixed(gs1AiRegistry[ai]) ? GS : '')).join(''), ambiguous: false };
+}
 export function parseGs1(rawInput) {
   if (typeof rawInput !== 'string' || !rawInput.length) throw new Error('EMPTY');
   let input = rawInput.trim();
-  input = input.startsWith(']C1') ? input.slice(3) : input;
+  if (input.startsWith(']C1')) input = input.slice(3);
+  input = input.replace(/<GS>/gi, GS).replace(/\\x1d/gi, GS).replace(/\\u001d/gi, GS);
+  if (!input.length) throw new Error('EMPTY');
   if (/\([0-9]{2,4}\)/.test(input)) {
     const fields = [...input.matchAll(/\(([0-9]{2,4})\)/g)];
     if (!fields.length || fields[0].index !== 0) throw new Error('BAD_FORMAT');
-    const ais = new Set();
-    const parsed = fields.map((match, index) => {
-      const ai = match[1];
-      if (!FIXED_AI.has(ai) && !VARIABLE_AI.has(ai) && !/^310[0-5]$/.test(ai)) throw new Error('UNKNOWN_AI');
-      if (ais.has(ai)) throw new Error('DUPLICATE_AI');
-      ais.add(ai);
-      const start = match.index + match[0].length;
-      const end = index + 1 < fields.length ? fields[index + 1].index : input.length;
-      const value = input.slice(start, end);
+    const seen = new Set();
+    const parsed = fields.map((m, i) => {
+      const ai = m[1];
+      if (!gs1AiRegistry[ai]) throw new Error('UNKNOWN_AI');
+      if (seen.has(ai)) throw new Error('DUPLICATE_AI');
+      seen.add(ai);
+      const start = m.index + m[0].length;
+      const end = i + 1 < fields.length ? fields[i + 1].index : input.length;
+      const value = input.slice(start, end).replaceAll(GS, '');
       validateAiValue(ai, value);
       return { ai, value };
     });
-    return { ai: parsed, humanReadable: parsed.map(({ ai, value }) => '(' + ai + ')' + value).join(''), elementString: parsed.map(({ ai, value }, index) => ai + value + (index < parsed.length - 1 && VARIABLE_AI.has(ai) ? String.fromCharCode(29) : '')).join(''), ambiguous: false };
+    return makeParseResult(parsed);
   }
-
-  const aiList = [];
-  const seen = new Set();
+  const list = [], seen = new Set();
   let offset = 0;
   while (offset < input.length) {
-    if (input[offset] === String.fromCharCode(29)) { offset += 1; continue; }
+    if (input[offset] === GS) throw new Error('BAD_SEPARATOR');
     const ai = identifyAi(input, offset);
     if (!ai) throw new Error('UNKNOWN_AI');
     if (seen.has(ai)) throw new Error('DUPLICATE_AI');
-    seen.add(ai);
-    offset += ai.length;
-    const fixedLength = FIXED_AI.get(ai) ?? (/^310[0-5]$/.test(ai) ? 6 : undefined);
+    seen.add(ai); offset += ai.length;
+    const def = gs1AiRegistry[ai];
     let value;
-    if (fixedLength !== undefined) {
-      value = input.slice(offset, offset + fixedLength);
-      offset += value.length;
-      if (value.length !== fixedLength) throw new Error('BAD_LENGTH');
+    if (fieldIsFixed(def)) {
+      const length = fixedFieldLength(def);
+      value = input.slice(offset, offset + length);
+      if (value.length !== length) throw new Error('BAD_LENGTH');
+      offset += length;
     } else {
-      const separator = input.indexOf(String.fromCharCode(29), offset);
-      const end = separator === -1 ? input.length : separator;
+      const sep = input.indexOf(GS, offset);
+      const end = sep < 0 ? input.length : sep;
       value = input.slice(offset, end);
-      offset = end;
-      if (separator !== -1) offset += 1;
+      if (sep >= 0) offset = sep + 1;
       else {
-        for (let candidate = offset - value.length + 1; candidate < end - 1; candidate += 1) {
+        for (let candidate = offset + 1; candidate < end - 1; candidate += 1) {
           const nextAi = identifyAi(input, candidate);
           if (!nextAi) continue;
-          const nextFixedLength = FIXED_AI.get(nextAi) ?? (/^310[0-5]$/.test(nextAi) ? 6 : undefined);
-          const remainingLength = end - candidate - nextAi.length;
-          if (nextFixedLength !== undefined ? remainingLength >= nextFixedLength : remainingLength >= 1) {
-            throw new Error('AMBIGUOUS_GS');
-          }
+          const nextDef = gs1AiRegistry[nextAi];
+          const remaining = end - candidate - nextAi.length;
+          if (fieldIsFixed(nextDef) ? remaining >= fixedFieldLength(nextDef) : remaining >= 1) throw new Error('AMBIGUOUS_GS');
         }
+        offset = end;
       }
     }
-    validateAiValue(ai, value);
-    aiList.push({ ai, value });
+    validateAiValue(ai, value); list.push({ ai, value });
   }
-  return {
-    ai: aiList,
-    humanReadable: aiList.map(({ ai, value }) => '(' + ai + ')' + value).join(''),
-    elementString: input,
-    ambiguous: false,
-  };
+  return makeParseResult(list);
 }
 
 export function validateScan({ value, type, format }) {
@@ -157,13 +160,15 @@ export function validateScan({ value, type, format }) {
     try {
       const parsed = parseGs1(normalized);
       if (parsed.ambiguous) return { accepted: false, reason: 'GS1-128 je nejednoznačný: chybí oddělovač GS (ASCII 29).' };
-      return { accepted: true, value: normalized, gs1: parsed };
+      return { accepted: true, value: parsed.humanReadable, rawValue: normalized, gs1: parsed };
     } catch (error) {
       const reasons = {
         BAD_CHECK_DIGIT: 'Neplatná kontrolní číslice v GS1-128.',
         BAD_LENGTH: 'Neplatná délka pole GS1.',
         BAD_DATE: 'Neplatné datum v GS1.',
         UNKNOWN_AI: 'Neznámý identifikátor pole (AI) v GS1.',
+        BAD_FORMAT: 'Hodnota pole GS1 neodpovídá definici AI.',
+        BAD_SEPARATOR: 'Neplatný oddělovač GS (ASCII 29) v GS1.',
         AMBIGUOUS_GS: 'Chybí oddělovač GS mezi proměnlivými poli.',
         EMPTY: 'Kód je prázdný.',
       };

@@ -108,3 +108,14 @@ Kód SSCC (jediný AI 00, pevná délka) tímto rizikem **netrpí**.
 - Jednotkové testy: celý `gs1_vectors.json` (kontrolní číslice, SSCC, parsování platných i neplatných vstupů).
 - Round-trip: `generate(parse(x)) == x` pro všechny platné vektory.
 - Reálná zkouška: vytiskni 5 štítků, naskenuj je telefonem v aplikaci a druhým nezávislým skenerem/aplikací; hodnoty musí být stejné.
+
+
+## 8. Aktuální registr AI a rozdělení polí
+
+Zdroj oficiálních definic: `docs/gs1-application-identifiers.jsonld`, stažený z `https://ref.gs1.org/ai/GS1_Application_Identifiers.jsonld` (údaj `dc:lastModified`: 2026-01-26; licence a upozornění jsou součástí původního souboru). Z něj je vytvořen běhový registr `src/core/scanning/gs1-ai-registry.json` s 541 definicemi AI. Registry nese formát, regulární výraz, komponenty, délky, kontrolní číslice a metadata.
+
+Parser už nepoužívá ručně sestavený krátký seznam. Při čtení element stringu vybírá nejdelší platný prefix AI (4, 3 nebo 2 číslice), pro pole s pevnou délkou přečte přesný počet znaků a pro pole s proměnlivou délkou čte do GS (ASCII 29) nebo do konce dat. Pokud po proměnlivém poli nelze bezpečně určit hranici dalšího AI bez GS, odmítne řetězec jako nejednoznačný, místo aby tiše slil hodnoty.
+
+Po úspěšném skenu se hodnota ukládá a zobrazuje v čitelném tvaru `(AI)hodnota(AI)hodnota...`; původní dekódovaný řetězec zůstává v `rawValue` a normalizovaný element string v `gs1.elementString`. Závorky jsou zobrazovací formát, nejsou doslovně vloženy do čárového kódu.
+
+**SAP poznámka:** tento registr pokrývá aktuální veřejný registr GS1 AI. Neznamená automaticky podporu každého SAP IDoc/EANCOM/GS1 XML mapování, interních Z polí ani konkrétního SAP customizingu. Ty závisejí na konkrétním procesu a verzi SAP; standardní GS1 parser nemůže hádat proprietární pole.

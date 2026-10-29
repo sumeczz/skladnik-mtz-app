@@ -2,6 +2,19 @@
 
 Formát: Keep a Changelog; verze aplikace se zatím drží na 0.1.0.
 
+## [Nepublikováno] — kompletní registr GS1 AI
+
+### Změněno
+- Ručně udržovaný seznam AI byl nahrazen registrem odvozeným z aktuálního veřejného JSON-LD GS1: 541 identifikátorů, včetně jejich formátů, délek, komponent a validace.
+- GS1 parser rozděluje pevná a proměnlivá pole podle definice každého AI a GS oddělovače. Nejednoznačné řetězce bez povinného GS odmítá.
+- Úspěšně načtený GS1 kód se zobrazuje a ukládá jako `(AI)hodnota(AI)hodnota`; surový obsah zůstává dostupný jako `rawValue`.
+- Doplněny testy pro novější AI a počet definic registru.
+
+### Zdroj a hranice podpory
+- Registr: GS1 AI JSON-LD, poslední změna v metadatech zdroje 2026-01-26; viz `docs/gs1-application-identifiers.jsonld`.
+- GS1 AI není totéž co SAP IDoc, EANCOM nebo zákaznická Z-pole. Tyto integrace vyžadují konkrétní SAP rozhraní a mapování.
+
+
 ## [Nepublikováno] — audit projektu a diagnostika GS1-128
 
 ### Opraveno

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { calculateCheckDigit, createScanPipeline, parseGs1, validateEan, validateScan } from '../src/core/scanning/pipeline.js';
 import vectors from '../docs/test-vectors/gs1_vectors.json';
+import gs1AiRegistry from '../src/core/scanning/gs1-ai-registry.json';
 import { FakeScanSource } from '../src/core/scanning/scan-source.js';
 
 describe('barcode validation', () => {
@@ -32,6 +33,24 @@ describe('barcode validation', () => {
     expect(result.accepted).toBe(false);
     expect(result.reason).toContain('295030101609420');
     expect(result.reason).toContain('přepni typ na Code 128');
+  });
+  it('uses the current official GS1 AI registry, not a hand-maintained shortlist', () => {
+    expect(Object.keys(gs1AiRegistry).length).toBeGreaterThanOrEqual(541);
+    for (const [ai, definition] of Object.entries(gs1AiRegistry)) {
+      expect(ai.length, `AI length ${ai}`).toBeGreaterThanOrEqual(2);
+      expect(ai.length, `AI length ${ai}`).toBeLessThanOrEqual(4);
+      expect(() => new RegExp('^(?:' + definition.regex + ')$'), `AI regex ${ai}`).not.toThrow();
+    }
+    for (const ai of ['03', '12', '16', '22', '235', '242', '253', '402', '415', '8003', '8004', '8006', '8008', '8010', '8012', '8200']) {
+      expect(gs1AiRegistry[ai], `AI ${ai}`).toBeDefined();
+    }
+  });
+  it('parses newer GS1 AIs and returns the human-readable AI-separated value', () => {
+    const parsed = parseGs1('(03)04045907295032(12)260630(16)260630(22)VARIANT1(235)SERIAL123(242)123(8004)ASSET-123(8006)040459072950320101(8008)2606281230');
+    expect(parsed.ai.map(({ ai }) => ai)).toEqual(['03', '12', '16', '22', '235', '242', '8004', '8006', '8008']);
+    const result = validateScan({ value: '020404590729503211251105377065', type: 'gs1128', format: 'CODE_128' });
+    expect(result.value).toBe('(02)04045907295032(11)251105(37)7065');
+    expect(result.rawValue).toBe('020404590729503211251105377065');
   });
   it('accepts every valid GS1 parser reference vector', () => {
     for (const vector of vectors.parse_valid) {
