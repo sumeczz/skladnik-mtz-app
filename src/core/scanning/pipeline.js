@@ -110,40 +110,55 @@ export function parseGs1(rawInput) {
     });
     return makeParseResult(parsed);
   }
-  const list = [], seen = new Set();
-  let offset = 0;
-  while (offset < input.length) {
-    if (input[offset] === GS) throw new Error('BAD_SEPARATOR');
+  // Parse with bounded backtracking when a variable-length field has no GS.
+  // AI-looking digits inside a field value are not sufficient evidence of a boundary:
+  // accept an inferred split only if the complete remainder also validates uniquely.
+  function parseFrom(offset, seen, list, solutions) {
+    if (solutions.length > 1) return;
+    if (offset === input.length) { solutions.push(list); return; }
+    if (offset > input.length || input[offset] === GS) return;
     const ai = identifyAi(input, offset);
-    if (!ai) throw new Error('UNKNOWN_AI');
-    if (seen.has(ai)) throw new Error('DUPLICATE_AI');
-    seen.add(ai); offset += ai.length;
+    if (!ai || seen.has(ai)) return;
+    const nextSeen = new Set(seen); nextSeen.add(ai);
+    const nextOffset = offset + ai.length;
     const def = gs1AiRegistry[ai];
-    let value;
     if (fieldIsFixed(def)) {
-      const length = fixedFieldLength(def);
-      value = input.slice(offset, offset + length);
-      if (value.length !== length) throw new Error('BAD_LENGTH');
-      offset += length;
-    } else {
-      const sep = input.indexOf(GS, offset);
-      const end = sep < 0 ? input.length : sep;
-      value = input.slice(offset, end);
-      if (sep >= 0) offset = sep + 1;
-      else {
-        for (let candidate = offset + 1; candidate < end - 1; candidate += 1) {
-          const nextAi = identifyAi(input, candidate);
-          if (!nextAi) continue;
-          const nextDef = gs1AiRegistry[nextAi];
-          const remaining = end - candidate - nextAi.length;
-          if (fieldIsFixed(nextDef) ? remaining >= fixedFieldLength(nextDef) : remaining >= 1) throw new Error('AMBIGUOUS_GS');
-        }
-        offset = end;
-      }
+      const length = fixedFieldLength(def), value = input.slice(nextOffset, nextOffset + length);
+      if (value.length !== length) return;
+      try { validateAiValue(ai, value); } catch { return; }
+      parseFrom(nextOffset + length, nextSeen, [...list, { ai, value }], solutions);
+      return;
     }
-    validateAiValue(ai, value); list.push({ ai, value });
+    const sep = input.indexOf(GS, nextOffset);
+    const end = sep < 0 ? input.length : sep;
+    const candidates = [];
+    if (sep >= 0) candidates.push(end);
+    else {
+      // Try each plausible next-AI boundary, but only retain fully valid parses.
+      for (let candidate = nextOffset + 1; candidate < end; candidate += 1) {
+        const nextAi = identifyAi(input, candidate);
+        if (nextAi && !nextSeen.has(nextAi)) candidates.push(candidate);
+      }
+      candidates.push(end); // this variable field may be the final field
+    }
+    for (const boundary of candidates) {
+      const value = input.slice(nextOffset, boundary);
+      try { validateAiValue(ai, value); } catch { continue; }
+      const next = sep >= 0 && boundary === end ? end + 1 : boundary;
+      parseFrom(next, nextSeen, [...list, { ai, value }], solutions);
+      if (solutions.length > 1) return;
+    }
   }
-  return makeParseResult(list);
+  const solutions = [];
+  parseFrom(0, new Set(), [], solutions);
+  if (!solutions.length) {
+    // Preserve useful validation errors for malformed single-field inputs.
+    const ai = identifyAi(input, 0);
+    if (!ai) throw new Error('UNKNOWN_AI');
+    throw new Error('BAD_FORMAT');
+  }
+  if (solutions.length > 1) throw new Error('AMBIGUOUS_GS');
+  return makeParseResult(solutions[0]);
 }
 
 export function validateScan({ value, type, format }) {
