@@ -1,8 +1,8 @@
 import './styles.css';
 import { openDatabase, getDashboardSummary, getSetting, saveSetting } from './storage/db.js';
 import { CameraScanSource } from './core/scanning/camera.js';
-import { CODE_TYPES, createScanPipeline } from './core/scanning/pipeline.js';
-import JsBarcode from 'jsbarcode';
+import { CODE_TYPES, createScanPipeline, parseGs1 } from './core/scanning/pipeline.js';
+import bwipjs from 'bwip-js';
 import { addScanToPallet, closeActivePallet, listPallets, undoLastScan } from './core/scanning/pallet-store.js';
 
 const byId = (id) => document.getElementById(id);
@@ -240,18 +240,28 @@ function renderPalletDetail() {
     barcodePanel.className = 'pallet-generated-barcode';
     const barcodeLabel = document.createElement('small');
     barcodeLabel.textContent = `Vygenerovaný čárový kód · ${CODE_TYPES[scan.type]?.label ?? scan.type}`;
-    const barcode = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    barcode.setAttribute('role', 'img');
-    barcode.setAttribute('aria-label', `Čárový kód ${scan.value}`);
-    barcodePanel.append(barcodeLabel, barcode);
+    barcodePanel.append(barcodeLabel);
     try {
-      const format = ['code128', 'gs1128'].includes(scan.type) ? 'CODE128' : null;
-      if (!format) throw new Error('Pro tento typ zatím není generování dostupné.');
-      JsBarcode(barcode, scan.value, { format, displayValue: true, height: 54, margin: 8, fontSize: 13, background: '#ffffff', lineColor: '#17231a', width: 2 });
-    } catch {
+      let bcid;
+      let text = scan.value;
+      if (scan.type === 'qr') bcid = 'qrcode';
+      else if (scan.type === 'gs1128') { bcid = 'gs1-128'; text = parseGs1(scan.value).humanReadable; }
+      else if (scan.type === 'code128') bcid = 'code128';
+      else if (scan.type === 'ean13') bcid = 'ean13';
+      else if (scan.type === 'ean8') bcid = 'ean8';
+      else if (scan.type === 'code39') bcid = 'code39';
+      else if (scan.type === 'dataMatrix') bcid = 'datamatrix';
+      else if (scan.type === 'itf') bcid = 'interleaved2of5';
+      else throw new Error('Unsupported barcode type');
+      const svgText = bwipjs.toSVG({ bcid, text, scale: 2, height: 14, includetext: scan.type !== 'qr', textxalign: 'center', backgroundcolor: 'FFFFFF', barcolor: '17231A', padding: 8 });
+      const generated = new DOMParser().parseFromString(svgText, 'image/svg+xml').documentElement;
+      generated.setAttribute('role', 'img');
+      generated.setAttribute('aria-label', `Vygenerovan? k?d ${scan.value}`);
+      generated.style.width = '100%'; generated.style.height = 'auto';
+      barcodePanel.append(generated);
+    } catch (error) {
       barcodePanel.classList.add('pallet-generated-barcode-error');
-      barcodeLabel.textContent = 'Čárový kód nelze pro tuto hodnotu vygenerovat.';
-      barcode.remove();
+      barcodeLabel.textContent = 'K?d nelze v tomto form?tu vygenerovat.';
     }
     item.append(barcodePanel);
     list.append(item);

@@ -44,7 +44,7 @@ export class CameraScanSource extends ScanSource {
     this.active = true;
     this.paused = false;
     const formats = CODE_TYPES[type].formats.map((format) => FORMAT_MAP[format]);
-    const hints = new Map([[DecodeHintType.POSSIBLE_FORMATS, formats], [DecodeHintType.TRY_HARDER, true]]);
+    const hints = new Map([[DecodeHintType.POSSIBLE_FORMATS, formats], [DecodeHintType.TRY_HARDER, true], ...(type === 'gs1128' ? [[DecodeHintType.ASSUME_GS1, true]] : [])]);
     this.reader = new BrowserMultiFormatReader(hints);
     this.onStatus('requesting');
     try {
